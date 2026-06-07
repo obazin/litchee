@@ -1,6 +1,6 @@
 # litchee
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE-MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Rust 2024](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org)
 [![Lichess API](https://img.shields.io/badge/Lichess%20API-184%2F184%20operations-brightgreen.svg)](https://lichess.org/api)
 
@@ -440,7 +440,7 @@ the source of truth for endpoints and types.
 
 ## License
 
-Licensed under the [MIT License](LICENSE-MIT).
+Licensed under the [MIT License](LICENSE).
 
 [Lichess API]: https://lichess.org/api
 [`LichessError`]: https://docs.rs/litchee/latest/litchee/error/enum.LichessError.html
