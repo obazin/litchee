@@ -1,0 +1,58 @@
+[package]
+name = "litchee"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "An async, builder-pattern Rust client for the Lichess API with PKCE OAuth support"
+license = "MIT"
+repository = "https://github.com/seventhrank/litchee"
+readme = "README.md"
+keywords = ["lichess", "chess", "api", "client", "oauth"]
+categories = ["api-bindings", "asynchronous"]
+# Keep the published crate lean: ship src + license + readme + changelog only.
+exclude = [
+    "/reference",
+    "/.github",
+    "/.claude",
+    "/clippy.toml",
+    "/rustfmt.toml",
+    "/CLAUDE.md",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+async-stream = "0.3.6"
+base64 = "0.22.1"
+bytes = "1.11.1"
+futures-core = "0.3.32"
+futures-util = "0.3.32"
+rand = "0.8"
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "json", "form", "query", "stream", "http2"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+serde_urlencoded = "0.7.1"
+sha2 = "0.10"
+thiserror = "2.0.18"
+url = "2.5.8"
+
+[dev-dependencies]
+futures-util = "0.3.32"
+tokio = { version = "1.52.3", features = ["macros", "rt-multi-thread"] }
+wiremock = "0.6.5"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Pragmatic opt-outs for an API-binding crate with many DTOs and re-exports.
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+must_use_candidate = "allow"

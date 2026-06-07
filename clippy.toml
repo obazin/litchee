@@ -1,0 +1,16 @@
+# Clippy thresholds tuned to reinforce the project's "small units" rule
+# (see CLAUDE.md). Lint *levels* (deny-warnings, pedantic opt-ins) are applied
+# from the `[lints]` table in Cargo.toml and CI flags, not here.
+
+# Keep functions simple; a high score usually means the 20-LOC limit is at risk.
+cognitive-complexity-threshold = 15
+
+# Encourage builders / param structs instead of wide signatures.
+# (Clippy's default; a few builder constructors legitimately take 6 inputs.)
+too-many-arguments-threshold = 7
+
+# Flag gnarly types early so we introduce aliases / newtypes.
+type-complexity-threshold = 250
+
+# Apply pedantic lints to the public API too (this is a client library).
+avoid-breaking-exported-api = false

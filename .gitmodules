@@ -1,0 +1,3 @@
+[submodule "reference/lichess-api"]
+	path = reference/lichess-api
+	url = https://github.com/lichess-org/api.git
