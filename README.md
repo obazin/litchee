@@ -415,7 +415,7 @@ The submodule is **development-only**: it is excluded from the published crate.
 Clone it with:
 
 ```bash
-git clone --recurse-submodules https://github.com/seventhrank/litchee
+git clone --recurse-submodules https://github.com/obazin/litchee
 # or, in an existing clone:
 git submodule update --init --recursive
 ```
