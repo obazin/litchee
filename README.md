@@ -71,6 +71,10 @@ The minimum supported Rust version is **1.85** (edition 2024).
 
 ### 1. Log in with Lichess (OAuth2 + PKCE)
 
+> New to OAuth or PKCE? The [**PKCE flow guide**](PKCE_GUIDE.md) walks through the
+> whole "Log in with Lichess" flow step by step, for beginners — with a glossary
+> of OAuth terms at the end.
+
 ```rust,no_run
 use litchee::LichessClient;
 use litchee::api::auth::oauth::{AuthorizationRequest, CodeExchange, Scope};
