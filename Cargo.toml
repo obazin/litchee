@@ -2,7 +2,7 @@
 name = "litchee"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 description = "An async, builder-pattern Rust client for the Lichess API with PKCE OAuth support"
 license = "MIT"
 repository = "https://github.com/obazin/litchee"

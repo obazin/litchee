@@ -71,10 +71,13 @@ where
                 }
             }
         }
-        if let Some(line) = splitter.finish() {
-            if let Some(item) = parse_line(&line)? {
-                yield item;
-            }
+        // Flatten the trailing-line logic into a single `if let`: let-chains
+        // (Rust 2024) aren't usable here because `async_stream` parses this body
+        // under its own edition, and a nested `if let` would trip
+        // `clippy::collapsible_if`.
+        let trailing = splitter.finish().map(|line| parse_line(&line)).transpose()?;
+        if let Some(item) = trailing.flatten() {
+            yield item;
         }
     }
 }

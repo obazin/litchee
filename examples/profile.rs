@@ -12,10 +12,10 @@ async fn main() -> litchee::Result<()> {
     let me = client.account().profile().await?;
     println!("Logged in as {} <{}>", me.user.username, me.url);
 
-    if let Some(perfs) = &me.user.perfs {
-        if let Some(blitz) = &perfs.blitz {
-            println!("Blitz rating: {}", blitz.rating);
-        }
+    if let Some(perfs) = &me.user.perfs
+        && let Some(blitz) = &perfs.blitz
+    {
+        println!("Blitz rating: {}", blitz.rating);
     }
 
     Ok(())
