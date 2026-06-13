@@ -32,6 +32,42 @@ async fn export_study_pgn_returns_text() {
 }
 
 #[tokio::test]
+async fn export_chapter_pgn_returns_text() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/study/WTvnkWAL/ch1.pgn"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"Chapter\"]\n\n1. e4 *"))
+        .mount(&server)
+        .await;
+
+    let pgn = client(&server)
+        .studies()
+        .export_chapter_pgn("WTvnkWAL", "ch1")
+        .await
+        .unwrap();
+
+    assert!(pgn.contains("Chapter"));
+}
+
+#[tokio::test]
+async fn export_all_pgn_returns_text() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/study/by/bobby/export.pgn"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"All\"]\n\n1. d4 *"))
+        .mount(&server)
+        .await;
+
+    let pgn = client(&server)
+        .studies()
+        .export_all_pgn("bobby")
+        .await
+        .unwrap();
+
+    assert!(pgn.contains("All"));
+}
+
+#[tokio::test]
 async fn list_metadata_streams_studies() {
     let server = MockServer::start().await;
     let body = concat!(

@@ -17,8 +17,9 @@ These are hard constraints. Do not violate them; if a task seems to require it,
 stop and flag it.
 
 ### 1. Folder organization mirrors the API's business concerns
-Each API concern is a folder containing a `mod.rs`, grouped into **category**
-folders by business concern, all under `src/api/`. The core/plumbing modules
+Each API concern is a **single module file** (`<concern>.rs`), grouped into
+**category** folders by business concern, all under `src/api/`. A category is a
+folder with a `mod.rs` that declares its concern files. The core/plumbing modules
 (`client`, `config`, `error`, `http`, `model`, `stream`) stay at `src/` root.
 
 ```
@@ -26,32 +27,40 @@ src/
   lib.rs
   client/ config/ error/ http/ model/ stream/   # core (not API concerns)
   api/
-    auth/          oauth
-    users/         account, users, fide
-    social/        relations, messaging, teams
-    tournaments/   arena, swiss, simuls
-    training/      puzzles, studies
-    broadcasting/  broadcasts, tv
-    database/      opening_explorer, tablebase, analysis
-    gameplay/      board, bot, challenges, bulk_pairing, games
-    engine/        external_engine
+    auth/          oauth/ (a folder — see exception below)
+    users/         account.rs, players.rs, fide.rs
+    social/        relations.rs, messaging.rs, teams.rs
+    tournaments/   arena.rs, swiss.rs, simuls.rs
+    training/      puzzles.rs, studies.rs
+    broadcasting/  broadcasts.rs, tv.rs
+    database/      opening_explorer.rs, tablebase.rs, analysis.rs
+    gameplay/      board.rs, bot.rs, challenges.rs, bulk_pairing.rs, games.rs
+    engine/        external_engine.rs
 ```
+
+A concern is **one flat file**: its endpoint accessor/impl, its `Lichess*` DTOs,
+and its tests all live together in `<concern>.rs` — do not split a concern into a
+`mod.rs` + `model.rs` + sub-files folder. **Exception:** `oauth` stays a folder
+(`auth/oauth/` with `mod.rs`, `pkce.rs`, `scope.rs`, `token.rs`) because its parts
+are genuinely independent units.
 
 Public paths follow the tree, e.g. `litchee::api::gameplay::board::*`. Endpoint
 accessors are unaffected (`client.board()`, `client.account()`, …). When adding
-a new concern, place it in the most fitting category (create a new category if
-none fits).
+a new concern, place it in the most fitting category as a single `<concern>.rs`
+file (create a new category folder if none fits).
 
 DTOs belong with the concern they serve (or in the shared root `model` module
 when genuinely cross-cutting). Do not create a single god-module of types.
 
 ### 2. Size limits (enforced, no exceptions)
-- **No file may exceed 600 lines of code.**
+- **No file may exceed 900 lines of code.**
 - **No method/function may exceed 20 lines of code.**
 
-When approaching a limit, **split eagerly**: extract helpers, break a file into a
-folder with `mod.rs` and submodules. Prefer many small, single-purpose units over
-large ones.
+The file cap is 900 (not 600) because a concern is a single flat file bundling
+its endpoints, DTOs, and tests (see rule 1). When approaching the limit, **split
+eagerly**: extract helpers, or — if a concern genuinely outgrows one file — give
+it the `oauth`-style folder treatment. Prefer many small, single-purpose units
+over large ones.
 
 ### 3. Exhaustive, specific error mapping
 **Every error the API can return must map to a specific Rust error variant** — not
@@ -132,8 +141,10 @@ names** (types, methods, modules). Borrow concepts, not code or identifiers.
 ---
 
 ## Common commands
+The Rust toolchain comes from the Nix dev shell defined in `flake.nix`
+(`chess-flake`'s `rustShell`). Run commands inside it:
 ```bash
-cargo build
+nix develop --command cargo build          # or: direnv allow, then plain cargo
 cargo test                 # unit + integration tests
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt

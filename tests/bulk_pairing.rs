@@ -1,5 +1,6 @@
 //! Integration tests for the Bulk Pairing API.
 
+use futures_util::StreamExt;
 use litchee::LichessClient;
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -29,6 +30,37 @@ async fn list_returns_pairings() {
 
     assert_eq!(pairings.len(), 1);
     assert_eq!(pairings[0].id, "RV");
+}
+
+#[tokio::test]
+async fn get_returns_a_pairing() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/bulk-pairing/RV"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(PAIRING))
+        .mount(&server)
+        .await;
+
+    let pairing = client(&server).bulk_pairing().get("RV").await.unwrap();
+
+    assert_eq!(pairing.id, "RV");
+}
+
+#[tokio::test]
+async fn games_streams_games() {
+    let server = MockServer::start().await;
+    let body = "{\"id\":\"g1\"}\n{\"id\":\"g2\"}\n";
+    Mock::given(method("GET"))
+        .and(path("/api/bulk-pairing/RV/games"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server).bulk_pairing().games("RV").await.unwrap();
+    let games: Vec<_> = stream.collect().await;
+
+    assert_eq!(games.len(), 2);
+    assert_eq!(games[0].as_ref().unwrap().id, "g1");
 }
 
 #[tokio::test]

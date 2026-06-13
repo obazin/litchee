@@ -165,3 +165,67 @@ async fn seek_streams_keepalive() {
     let items: Vec<_> = stream.collect().await;
     assert!(items.is_empty()); // keep-alive blank lines yield nothing
 }
+
+#[tokio::test]
+async fn abort_posts_to_the_action_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/board/game/g/abort"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+
+    client(&server).board().abort("g").await.unwrap();
+}
+
+#[tokio::test]
+async fn claim_victory_posts_to_the_action_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/board/game/g/claim-victory"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+
+    client(&server).board().claim_victory("g").await.unwrap();
+}
+
+#[tokio::test]
+async fn claim_draw_posts_to_the_action_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/board/game/g/claim-draw"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+
+    client(&server).board().claim_draw("g").await.unwrap();
+}
+
+#[tokio::test]
+async fn berserk_posts_to_the_action_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/board/game/g/berserk"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+
+    client(&server).board().berserk("g").await.unwrap();
+}
+
+#[tokio::test]
+async fn handle_takeback_uses_no_segment() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/board/game/g/takeback/no"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+
+    client(&server)
+        .board()
+        .handle_takeback("g", false)
+        .await
+        .unwrap();
+}

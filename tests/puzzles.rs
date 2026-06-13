@@ -153,3 +153,44 @@ async fn dashboard_and_storm() {
         .unwrap();
     assert!(batch.puzzles.is_empty());
 }
+
+#[tokio::test]
+async fn replay_returns_session() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/puzzle/replay/30/mateIn1"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"{"angle":{"key":"mateIn1"},"replay":{"days":30}}"#),
+        )
+        .mount(&server)
+        .await;
+
+    let replay = client(&server)
+        .puzzles()
+        .replay(30, "mateIn1")
+        .await
+        .unwrap();
+
+    assert!(replay.replay.is_some());
+}
+
+#[tokio::test]
+async fn storm_dashboard_returns_scores() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/storm/dashboard/maia"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(r#"{"high":{"allTime":50},"days":[]}"#),
+        )
+        .mount(&server)
+        .await;
+
+    let dash = client(&server)
+        .puzzles()
+        .storm_dashboard("maia")
+        .await
+        .unwrap();
+
+    assert!(dash.high.is_some());
+}

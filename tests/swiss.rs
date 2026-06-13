@@ -2,7 +2,7 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
-use wiremock::matchers::{body_string_contains, method, path};
+use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> LichessClient {
@@ -115,4 +115,56 @@ async fn edit_posts_to_edit_path() {
         .await
         .unwrap();
     assert_eq!(swiss.id, "abc");
+}
+
+#[tokio::test]
+async fn withdraw_posts_to_the_withdraw_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/swiss/abc/withdraw"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+    client(&server).swiss().withdraw("abc").await.unwrap();
+}
+
+#[tokio::test]
+async fn terminate_posts_to_the_terminate_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/swiss/abc/terminate"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+    client(&server).swiss().terminate("abc").await.unwrap();
+}
+
+#[tokio::test]
+async fn schedule_next_round_posts_to_the_schedule_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/swiss/abc/schedule-next-round"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+    client(&server)
+        .swiss()
+        .schedule_next_round("abc")
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn games_streams_with_ndjson_accept() {
+    let server = MockServer::start().await;
+    let body = "{\"id\":\"g1\"}\n{\"id\":\"g2\"}\n";
+    Mock::given(method("GET"))
+        .and(path("/api/swiss/abc/games"))
+        .and(header("accept", "application/x-ndjson"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+    let stream = client(&server).swiss().games("abc").await.unwrap();
+    let games: Vec<_> = stream.collect().await;
+    assert_eq!(games.len(), 2);
 }

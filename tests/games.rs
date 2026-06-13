@@ -167,3 +167,122 @@ async fn stream_moves_yields_updates() {
     assert_eq!(updates.len(), 2);
     assert_eq!(updates[1].as_ref().unwrap().lm.as_deref(), Some("e7e5"));
 }
+
+#[tokio::test]
+async fn current_game_returns_game() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/user/bobby/current-game"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"cur123"}"#))
+        .mount(&server)
+        .await;
+    let game = client(&server).games().current_game("bobby").await.unwrap();
+    assert_eq!(game.id, "cur123");
+}
+
+#[tokio::test]
+async fn export_user_games_as_pgn_sets_accept_header() {
+    let server = MockServer::start().await;
+    let pgn = "[Event \"Rated\"]\n\n1. d4 d5 *";
+    Mock::given(method("GET"))
+        .and(path("/api/games/user/bobby"))
+        .and(header("accept", "application/x-chess-pgn"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(pgn))
+        .mount(&server)
+        .await;
+    let exported = client(&server)
+        .games()
+        .export_user("bobby")
+        .pgn()
+        .await
+        .unwrap();
+    assert!(exported.contains("1. d4 d5"));
+}
+
+#[tokio::test]
+async fn export_bookmarks_streams_games() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/games/export/bookmarks"))
+        .and(header("accept", "application/x-ndjson"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string("{\"id\":\"b1\"}\n{\"id\":\"b2\"}\n"),
+        )
+        .mount(&server)
+        .await;
+    let stream = client(&server).games().export_bookmarks().await.unwrap();
+    let games: Vec<_> = stream.collect().await;
+    assert_eq!(games.len(), 2);
+    assert_eq!(games[0].as_ref().unwrap().id, "b1");
+}
+
+#[tokio::test]
+async fn export_imports_streams_games() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/games/export/imports"))
+        .and(header("accept", "application/x-ndjson"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{\"id\":\"i1\"}\n"))
+        .mount(&server)
+        .await;
+    let stream = client(&server).games().export_imports().await.unwrap();
+    let games: Vec<_> = stream.collect().await;
+    assert_eq!(games.len(), 1);
+    assert_eq!(games[0].as_ref().unwrap().id, "i1");
+}
+
+#[tokio::test]
+async fn stream_by_users_streams_games() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/stream/games-by-users"))
+        .and(body_string_contains("alice,bob"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string("{\"id\":\"u1\"}\n{\"id\":\"u2\"}\n"),
+        )
+        .mount(&server)
+        .await;
+    let stream = client(&server)
+        .games()
+        .stream_by_users(&["alice", "bob"])
+        .await
+        .unwrap();
+    let games: Vec<_> = stream.collect().await;
+    assert_eq!(games.len(), 2);
+}
+
+#[tokio::test]
+async fn stream_by_ids_streams_games() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/stream/games/mystream"))
+        .and(body_string_contains("a,b"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string("{\"id\":\"a\"}\n{\"id\":\"b\"}\n"),
+        )
+        .mount(&server)
+        .await;
+    let stream = client(&server)
+        .games()
+        .stream_by_ids("mystream", &["a", "b"])
+        .await
+        .unwrap();
+    let games: Vec<_> = stream.collect().await;
+    assert_eq!(games.len(), 2);
+}
+
+#[tokio::test]
+async fn add_to_stream_posts_ids() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/stream/games/mystream/add"))
+        .and(body_string_contains("a,b"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+    client(&server)
+        .games()
+        .add_to_stream("mystream", &["a", "b"])
+        .await
+        .unwrap();
+}

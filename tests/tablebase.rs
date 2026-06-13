@@ -36,6 +36,21 @@ async fn standard_lookup_uses_the_tablebase_host() {
 }
 
 #[tokio::test]
+async fn atomic_lookup_hits_the_variant_path() {
+    let server = MockServer::start().await;
+    let body = r#"{"category":"win","moves":[{"uci":"e2e4","san":"e4","category":"loss"}]}"#;
+    Mock::given(method("GET"))
+        .and(path("/atomic"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let position = client(&server).tablebase().atomic("fen").await.unwrap();
+
+    assert_eq!(position.moves.len(), 1);
+}
+
+#[tokio::test]
 async fn antichess_lookup_hits_the_variant_path() {
     let server = MockServer::start().await;
     let body = r#"{"category":"draw","moves":[]}"#;

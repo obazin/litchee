@@ -59,6 +59,31 @@ async fn feed_streams_tagged_events() {
 }
 
 #[tokio::test]
+async fn channel_feed_streams_tagged_events() {
+    let server = MockServer::start().await;
+    let body = concat!(
+        r#"{"t":"featured","d":{"id":"g","orientation":"white","players":[{"color":"white","rating":1500,"seconds":60},{"color":"black","rating":1490,"seconds":60}],"fen":"startpos"}}"#,
+        "\n",
+        r#"{"t":"fen","d":{"fen":"x","lm":"e2e4","wc":60,"bc":59}}"#,
+        "\n",
+    );
+    Mock::given(method("GET"))
+        .and(path("/api/tv/blitz/feed"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server).tv().channel_feed("blitz").await.unwrap();
+    let events: Vec<_> = stream.collect().await;
+
+    assert_eq!(events.len(), 2);
+    assert!(matches!(
+        events[0].as_ref().unwrap(),
+        LichessTvFeedEvent::Featured(_)
+    ));
+}
+
+#[tokio::test]
 async fn channel_games_streams_games() {
     let server = MockServer::start().await;
     let body = "{\"id\":\"g1\"}\n{\"id\":\"g2\"}\n";

@@ -160,3 +160,207 @@ async fn players_returns_entries() {
     let players = client(&server).broadcasts().players("t1").await.unwrap();
     assert_eq!(players[0].name.as_deref(), Some("Carlsen"));
 }
+
+#[tokio::test]
+async fn by_user_streams_broadcasts() {
+    let server = MockServer::start().await;
+    let body = concat!(
+        r#"{"tour":{"id":"a","name":"One"},"rounds":[]}"#,
+        "\n",
+        r#"{"tour":{"id":"b","name":"Two"},"rounds":[]}"#,
+        "\n",
+    );
+    Mock::given(method("GET"))
+        .and(path("/api/broadcast/by/thibault"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server)
+        .broadcasts()
+        .by_user("thibault")
+        .await
+        .unwrap();
+    let broadcasts: Vec<_> = stream.collect().await;
+
+    assert_eq!(broadcasts.len(), 2);
+    assert_eq!(broadcasts[1].as_ref().unwrap().tour.id, "b");
+}
+
+#[tokio::test]
+async fn my_rounds_streams_rounds() {
+    let server = MockServer::start().await;
+    let body = concat!(
+        r#"{"round":{"id":"r1","name":"R1"}}"#,
+        "\n",
+        r#"{"round":{"id":"r2","name":"R2"}}"#,
+        "\n",
+    );
+    Mock::given(method("GET"))
+        .and(path("/api/broadcast/my-rounds"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server).broadcasts().my_rounds().await.unwrap();
+    let rounds: Vec<_> = stream.collect().await;
+
+    assert_eq!(rounds.len(), 2);
+    assert!(rounds[0].as_ref().unwrap().data.contains_key("round"));
+}
+
+#[tokio::test]
+async fn round_returns_round_view() {
+    let server = MockServer::start().await;
+    let body = r#"{"tour":{"id":"abc","name":"World Champ"},"round":{"id":"r1"},"games":[]}"#;
+    Mock::given(method("GET"))
+        .and(path("/api/broadcast/wc/round-1/r1"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let view = client(&server)
+        .broadcasts()
+        .round("wc", "round-1", "r1")
+        .await
+        .unwrap();
+
+    assert_eq!(view.tour.unwrap().id, "abc");
+}
+
+#[tokio::test]
+async fn all_rounds_pgn_returns_text() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/broadcast/abc.pgn"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"Tour\"]\n\n1. e4 *"))
+        .mount(&server)
+        .await;
+
+    let pgn = client(&server)
+        .broadcasts()
+        .all_rounds_pgn("abc")
+        .await
+        .unwrap();
+
+    assert!(pgn.contains("Tour"));
+}
+
+#[tokio::test]
+async fn stream_round_pgn_returns_text() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/stream/broadcast/round/r1.pgn"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"Live\"]\n\n1. d4 *"))
+        .mount(&server)
+        .await;
+
+    let pgn = client(&server)
+        .broadcasts()
+        .stream_round_pgn("r1")
+        .await
+        .unwrap();
+
+    assert!(pgn.contains("Live"));
+}
+
+#[tokio::test]
+async fn player_returns_a_single_entry() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/broadcast/t1/players/p1"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(r#"{"name":"Carlsen","fideId":1503014}"#),
+        )
+        .mount(&server)
+        .await;
+
+    let player = client(&server)
+        .broadcasts()
+        .player("t1", "p1")
+        .await
+        .unwrap();
+
+    assert_eq!(player.name.as_deref(), Some("Carlsen"));
+}
+
+#[tokio::test]
+async fn team_standings_returns_entries() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/broadcast/t1/teams/standings"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"[{"name":"Team A"}]"#))
+        .mount(&server)
+        .await;
+
+    let standings = client(&server)
+        .broadcasts()
+        .team_standings("t1")
+        .await
+        .unwrap();
+
+    assert_eq!(standings[0].name.as_deref(), Some("Team A"));
+}
+
+#[tokio::test]
+async fn update_tour_posts_to_edit() {
+    let server = MockServer::start().await;
+    let body = r#"{"tour":{"id":"t1","name":"Renamed"},"rounds":[]}"#;
+    Mock::given(method("POST"))
+        .and(path("/broadcast/t1/edit"))
+        .and(body_string_contains("name=Renamed"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let tour = client(&server)
+        .broadcasts()
+        .update_tour("t1", "Renamed")
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(tour.tour.name, "Renamed");
+}
+
+#[tokio::test]
+async fn create_round_posts_to_new() {
+    let server = MockServer::start().await;
+    let body = r#"{"round":{"id":"r1"},"games":[]}"#;
+    Mock::given(method("POST"))
+        .and(path("/broadcast/t1/new"))
+        .and(body_string_contains("name=Round+1"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let view = client(&server)
+        .broadcasts()
+        .create_round("t1", "Round 1")
+        .send()
+        .await
+        .unwrap();
+
+    assert!(view.round.is_some());
+}
+
+#[tokio::test]
+async fn update_round_posts_to_edit() {
+    let server = MockServer::start().await;
+    let body = r#"{"round":{"id":"r1"},"games":[]}"#;
+    Mock::given(method("POST"))
+        .and(path("/broadcast/round/r1/edit"))
+        .and(body_string_contains("name=Renamed+Round"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let view = client(&server)
+        .broadcasts()
+        .update_round("r1", "Renamed Round")
+        .send()
+        .await
+        .unwrap();
+
+    assert!(view.round.is_some());
+}

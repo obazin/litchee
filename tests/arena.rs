@@ -147,3 +147,70 @@ async fn created_by_streams_arenas() {
     let arenas: Vec<_> = stream.collect().await;
     assert_eq!(arenas.len(), 2);
 }
+
+#[tokio::test]
+async fn get_returns_full_arena() {
+    let server = MockServer::start().await;
+    let body = r#"{"id":"abc","fullName":"Hourly","nbPlayers":50}"#;
+    Mock::given(method("GET"))
+        .and(path("/api/tournament/abc"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+    let arena = client(&server).arena().get("abc").await.unwrap();
+    assert_eq!(arena.id, "abc");
+}
+
+#[tokio::test]
+async fn setup_team_battle_posts_teams() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/tournament/team-battle/abc"))
+        .and(body_string_contains("teams=t1%2Ct2"))
+        .and(body_string_contains("nbLeaders=3"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"abc"}"#))
+        .mount(&server)
+        .await;
+    let arena = client(&server)
+        .arena()
+        .setup_team_battle("abc", &["t1", "t2"], 3)
+        .await
+        .unwrap();
+    assert_eq!(arena.id, "abc");
+}
+
+#[tokio::test]
+async fn played_by_streams_arenas() {
+    let server = MockServer::start().await;
+    let body = "{\"id\":\"a\"}\n{\"id\":\"b\"}\n";
+    Mock::given(method("GET"))
+        .and(path("/api/user/bob/tournament/played"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+    let stream = client(&server).arena().played_by("bob").await.unwrap();
+    let arenas: Vec<_> = stream.collect().await;
+    assert_eq!(arenas.len(), 2);
+}
+
+#[tokio::test]
+async fn withdraw_posts_to_the_withdraw_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/tournament/abc/withdraw"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+    client(&server).arena().withdraw("abc").await.unwrap();
+}
+
+#[tokio::test]
+async fn terminate_posts_to_the_terminate_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/tournament/abc/terminate"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+    client(&server).arena().terminate("abc").await.unwrap();
+}

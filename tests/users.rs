@@ -157,3 +157,59 @@ async fn write_note_posts_text() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn perf_stats_returns_stats() {
+    let server = MockServer::start().await;
+    let body = r#"{"rank":42,"percentile":98.5,"perf":{"nb":1000,"progress":12}}"#;
+    Mock::given(method("GET"))
+        .and(path("/api/user/bobby/perf/blitz"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+    let stats = client(&server)
+        .users()
+        .perf_stats("bobby", "blitz")
+        .await
+        .unwrap();
+    assert_eq!(stats.rank, Some(42));
+}
+
+#[tokio::test]
+async fn activity_returns_entries() {
+    let server = MockServer::start().await;
+    let body = r#"[{"interval":{"start":1700000000000,"end":1700086400000}}]"#;
+    Mock::given(method("GET"))
+        .and(path("/api/user/bobby/activity"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+    let activity = client(&server).users().activity("bobby").await.unwrap();
+    assert_eq!(activity[0].interval.start, 1700000000000);
+}
+
+#[tokio::test]
+async fn leaderboards_returns_top_users_per_perf() {
+    let server = MockServer::start().await;
+    let body = r#"{"bullet":[{"id":"a","username":"A"}]}"#;
+    Mock::given(method("GET"))
+        .and(path("/api/player"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+    let boards = client(&server).users().leaderboards().await.unwrap();
+    assert_eq!(boards["bullet"][0].username, "A");
+}
+
+#[tokio::test]
+async fn notes_returns_list() {
+    let server = MockServer::start().await;
+    let body = r#"[{"text":"strong player","date":1700000000000}]"#;
+    Mock::given(method("GET"))
+        .and(path("/api/user/bobby/note"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+    let notes = client(&server).users().notes("bobby").await.unwrap();
+    assert_eq!(notes[0].text.as_deref(), Some("strong player"));
+}

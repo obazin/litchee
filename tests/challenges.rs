@@ -174,3 +174,30 @@ async fn admin_challenge_tokens_returns_map() {
         .unwrap();
     assert_eq!(tokens["a"], "tok_a");
 }
+
+#[tokio::test]
+async fn show_returns_challenge() {
+    let server = MockServer::start().await;
+    let body = r#"{"id":"H9fIRZUk","url":"u","status":"created"}"#;
+    Mock::given(method("GET"))
+        .and(path("/api/challenge/H9fIRZUk/show"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let challenge = client(&server).challenges().show("H9fIRZUk").await.unwrap();
+
+    assert_eq!(challenge.id, "H9fIRZUk");
+}
+
+#[tokio::test]
+async fn cancel_posts_to_cancel_path() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/challenge/abc/cancel"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+
+    client(&server).challenges().cancel("abc").await.unwrap();
+}
