@@ -10,7 +10,7 @@ use std::fmt::Display;
 
 use futures_util::stream::BoxStream;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
-use reqwest::header::{HeaderMap, RETRY_AFTER};
+use reqwest::header::{HeaderMap, LAST_MODIFIED, RETRY_AFTER};
 use reqwest::{RequestBuilder, Response};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
@@ -70,6 +70,11 @@ fn error_message(body: &str) -> Option<String> {
 /// Parses the `Retry-After` header as a whole number of seconds. Pure.
 fn retry_after_secs(headers: &HeaderMap) -> Option<u64> {
     headers.get(RETRY_AFTER)?.to_str().ok()?.trim().parse().ok()
+}
+
+/// Reads the `Last-Modified` response header as an owned string, if present. Pure.
+pub(crate) fn last_modified(headers: &HeaderMap) -> Option<String> {
+    Some(headers.get(LAST_MODIFIED)?.to_str().ok()?.to_owned())
 }
 
 /// Sends a request and deserializes a JSON body into `T`.
@@ -137,6 +142,20 @@ mod tests {
     #[test]
     fn missing_retry_after_is_none() {
         assert_eq!(retry_after_secs(&HeaderMap::new()), None);
+    }
+
+    #[test]
+    fn reads_last_modified_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            LAST_MODIFIED,
+            HeaderValue::from_static("Tue, 25 Apr 2023 13:23:09 GMT"),
+        );
+        assert_eq!(
+            last_modified(&headers).as_deref(),
+            Some("Tue, 25 Apr 2023 13:23:09 GMT")
+        );
+        assert_eq!(last_modified(&HeaderMap::new()), None);
     }
 
     #[test]

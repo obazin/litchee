@@ -50,6 +50,15 @@ impl<'a> StudiesApi<'a> {
         http::text(self.client.request(Method::GET, Host::Default, &path)).await
     }
 
+    /// Reads a study's metadata headers without the body, for cheap
+    /// change-detection. Returns the `Last-Modified` value when present.
+    /// `HEAD /api/study/{studyId}.pgn`
+    pub async fn study_pgn_metadata(&self, study_id: &str) -> Result<Option<String>> {
+        let path = format!("/api/study/{}.pgn", http::segment(study_id));
+        let request = self.client.request(Method::HEAD, Host::Default, &path);
+        Ok(http::last_modified(http::send(request).await?.headers()))
+    }
+
     /// Exports all of a user's studies as PGN.
     /// `GET /api/study/by/{username}/export.pgn`
     pub async fn export_all_pgn(&self, username: &str) -> Result<String> {
