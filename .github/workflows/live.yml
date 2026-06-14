@@ -1,0 +1,26 @@
+name: Live API smoke tests
+
+# Hits the real Lichess API, so it is NOT part of the per-push/PR CI (which stays
+# hermetic). Trigger it manually, or on a weekly schedule, to catch drift between
+# the DTOs and live responses. LICHESS_TOKEN is optional: the public smoke tests
+# run without it; only the authenticated check needs it.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  live:
+    name: Live smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run live smoke tests
+        run: cargo test --test live -- --ignored --nocapture
+        env:
+          LICHESS_TOKEN: ${{ secrets.LICHESS_TOKEN }}
