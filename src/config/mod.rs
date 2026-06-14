@@ -136,8 +136,10 @@ mod tests {
 
     #[test]
     fn debug_redacts_the_token() {
-        let mut config = Config::default();
-        config.token = Some("lip_supersecret".to_owned());
+        let config = Config {
+            token: Some("lip_supersecret".to_owned()),
+            ..Default::default()
+        };
         let debug = format!("{config:?}");
         assert!(!debug.contains("lip_supersecret"));
         assert!(debug.contains("<redacted>"));
