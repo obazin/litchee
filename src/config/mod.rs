@@ -8,6 +8,7 @@
 
 use url::Url;
 
+use crate::retry::RetryPolicy;
 use crate::secret::Secret;
 
 /// The crate's default `User-Agent`, e.g. `litchee/0.1.0`.
@@ -58,6 +59,8 @@ pub(crate) struct Config {
     /// with [`StreamError::LineTooLong`](crate::error::StreamError::LineTooLong),
     /// a guard against unbounded memory growth on a malformed/stalled stream.
     pub(crate) max_line_bytes: usize,
+    /// How rate-limited (`429`) requests are retried (default: no retries).
+    pub(crate) retry_policy: RetryPolicy,
 }
 
 impl Default for Config {
@@ -70,6 +73,7 @@ impl Default for Config {
             token: None,
             user_agent: DEFAULT_USER_AGENT.to_owned(),
             max_line_bytes: DEFAULT_MAX_LINE_BYTES,
+            retry_policy: RetryPolicy::default(),
         }
     }
 }
