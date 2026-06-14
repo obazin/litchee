@@ -185,7 +185,7 @@ async fn activity_returns_entries() {
         .mount(&server)
         .await;
     let activity = client(&server).users().activity("bobby").await.unwrap();
-    assert_eq!(activity[0].interval.start, 1700000000000);
+    assert_eq!(activity[0].interval.start, 1_700_000_000_000);
 }
 
 #[tokio::test]
