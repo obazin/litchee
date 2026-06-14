@@ -56,9 +56,11 @@ pub mod model;
 mod client;
 mod config;
 mod http;
+mod retry;
 mod secret;
 mod stream;
 
 pub use client::{LichessClient, LichessClientBuilder};
 pub use error::{LichessError, Result};
+pub use retry::RetryPolicy;
 pub use secret::Secret;

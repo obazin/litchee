@@ -3,11 +3,13 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use reqwest::{Method, RequestBuilder};
+use reqwest::Method;
 use url::Url;
 
 use crate::config::{Config, Host};
 use crate::error::Result;
+use crate::http::ApiRequest;
+use crate::retry::RetryPolicy;
 use crate::secret::Secret;
 
 /// Default connection timeout applied to the built-in HTTP client.
@@ -60,14 +62,16 @@ impl LichessClient {
 
     /// Builds an authenticated request to `host` + `path` (path starts `/`).
     ///
-    /// Internal: the single place the bearer token is attached.
-    pub(crate) fn request(&self, method: Method, host: Host, path: &str) -> RequestBuilder {
+    /// Internal: the single place the bearer token is attached. The request
+    /// carries the client's [`RetryPolicy`] so rate-limited calls can retry.
+    pub(crate) fn request(&self, method: Method, host: Host, path: &str) -> ApiRequest {
         let url = self.config.url(host, path);
         let builder = self.http.request(method, url);
-        match &self.config.token {
+        let builder = match &self.config.token {
             Some(token) => builder.bearer_auth(token.expose()),
             None => builder,
-        }
+        };
+        ApiRequest::new(builder, self.config.retry_policy)
     }
 
     /// Builds an absolute URL for a host + path without issuing a request.
@@ -168,6 +172,17 @@ impl LichessClientBuilder {
     #[must_use]
     pub fn max_line_bytes(mut self, max: usize) -> Self {
         self.config.max_line_bytes = max;
+        self
+    }
+
+    /// Sets the [`RetryPolicy`] for rate-limited (`429`) requests.
+    ///
+    /// Retries are off by default; supply a policy to enable them. Only `429`
+    /// responses are retried (they were not processed, so retrying is safe);
+    /// the advised `Retry-After` is honoured.
+    #[must_use]
+    pub fn retry_policy(mut self, policy: RetryPolicy) -> Self {
+        self.config.retry_policy = policy;
         self
     }
 

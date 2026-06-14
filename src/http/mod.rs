@@ -10,12 +10,14 @@ use std::fmt::Display;
 
 use futures_util::stream::BoxStream;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
-use reqwest::header::{HeaderMap, LAST_MODIFIED, RETRY_AFTER};
-use reqwest::{RequestBuilder, Response};
-use serde::Deserialize;
+use reqwest::header::{HeaderMap, HeaderName, LAST_MODIFIED, RETRY_AFTER};
+use reqwest::{RequestBuilder, Response, StatusCode};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use tokio::time::sleep;
 
 use crate::error::{ApiError, LichessError, Result};
+use crate::retry::RetryPolicy;
 use crate::stream::ndjson;
 
 /// The shape of a Lichess error body: `{ "error": "..." }`.
@@ -42,9 +44,85 @@ pub(crate) fn segment(value: &str) -> impl Display + '_ {
     utf8_percent_encode(value, PATH_SEGMENT)
 }
 
+/// A request that carries the client's [`RetryPolicy`] so [`send`] can retry
+/// rate-limited (`429`) responses. Mirrors the small slice of
+/// `reqwest::RequestBuilder` the endpoints actually use.
+#[derive(Debug)]
+pub(crate) struct ApiRequest {
+    builder: RequestBuilder,
+    retry: RetryPolicy,
+}
+
+impl ApiRequest {
+    /// Wraps a builder with the policy to apply when it is sent.
+    pub(crate) fn new(builder: RequestBuilder, retry: RetryPolicy) -> Self {
+        Self { builder, retry }
+    }
+
+    /// Adds a request header (all call sites use static values).
+    pub(crate) fn header(mut self, name: HeaderName, value: &'static str) -> Self {
+        self.builder = self.builder.header(name, value);
+        self
+    }
+
+    /// Sets the URL query string from a serializable value.
+    pub(crate) fn query<T: Serialize + ?Sized>(mut self, query: &T) -> Self {
+        self.builder = self.builder.query(query);
+        self
+    }
+
+    /// Sets a URL-encoded form body.
+    pub(crate) fn form<T: Serialize + ?Sized>(mut self, form: &T) -> Self {
+        self.builder = self.builder.form(form);
+        self
+    }
+
+    /// Sets a JSON body.
+    pub(crate) fn json<T: Serialize + ?Sized>(mut self, json: &T) -> Self {
+        self.builder = self.builder.json(json);
+        self
+    }
+
+    /// Sets a raw body.
+    pub(crate) fn body(mut self, body: impl Into<reqwest::Body>) -> Self {
+        self.builder = self.builder.body(body);
+        self
+    }
+
+    /// Sends the request, retrying `429` responses per the policy. Returns the
+    /// final response (success or not); the caller classifies the status.
+    pub(crate) async fn send(self) -> reqwest::Result<Response> {
+        let Self { mut builder, retry } = self;
+        let mut attempt = 0;
+        loop {
+            let next = (attempt < retry.max_retries())
+                .then(|| builder.try_clone())
+                .flatten();
+            let response = builder.send().await?;
+            let Some(retry_builder) = next.filter(|_| is_rate_limited(&response)) else {
+                return Ok(response);
+            };
+            sleep(retry.delay(attempt, response.headers())).await;
+            builder = retry_builder;
+            attempt += 1;
+        }
+    }
+
+    /// Builds the underlying `reqwest::Request` (for inspection in tests).
+    #[cfg(test)]
+    pub(crate) fn build(self) -> reqwest::Result<reqwest::Request> {
+        self.builder.build()
+    }
+}
+
+/// Whether a response is a rate-limit rejection that is safe to retry.
+fn is_rate_limited(response: &Response) -> bool {
+    response.status() == StatusCode::TOO_MANY_REQUESTS
+}
+
 /// Sends a request, mapping any non-success status to a typed error.
-pub(crate) async fn send(builder: RequestBuilder) -> Result<Response> {
-    let response = builder.send().await?;
+pub(crate) async fn send(request: ApiRequest) -> Result<Response> {
+    let response = request.send().await?;
     if response.status().is_success() {
         Ok(response)
     } else {
@@ -80,22 +158,22 @@ pub(crate) fn last_modified(headers: &HeaderMap) -> Option<String> {
 /// Sends a request and deserializes a JSON body into `T`.
 ///
 /// `context` names what is being decoded, for clearer error messages.
-pub(crate) async fn json<T: DeserializeOwned>(builder: RequestBuilder, context: &str) -> Result<T> {
-    let response = send(builder).await?;
+pub(crate) async fn json<T: DeserializeOwned>(request: ApiRequest, context: &str) -> Result<T> {
+    let response = send(request).await?;
     let bytes = response.bytes().await?;
     serde_json::from_slice(&bytes).map_err(|source| LichessError::decode(context, source))
 }
 
 /// Sends a request and returns the body as text (for PGN / `text/plain`).
-pub(crate) async fn text(builder: RequestBuilder) -> Result<String> {
-    let response = send(builder).await?;
+pub(crate) async fn text(request: ApiRequest) -> Result<String> {
+    let response = send(request).await?;
     Ok(response.text().await?)
 }
 
 /// Sends a request that returns `{ "ok": true }` or `204 No Content`, where only
 /// success matters. The body is discarded once the status is validated.
-pub(crate) async fn ok(builder: RequestBuilder) -> Result<()> {
-    let response = send(builder).await?;
+pub(crate) async fn ok(request: ApiRequest) -> Result<()> {
+    let response = send(request).await?;
     drop(response.bytes().await?);
     Ok(())
 }
@@ -108,10 +186,10 @@ pub(crate) async fn ok(builder: RequestBuilder) -> Result<()> {
 /// [`StreamExt::next`](futures_util::StreamExt::next). `max_line_bytes` bounds a
 /// single buffered NDJSON line (see [`ndjson`](crate::stream::ndjson)).
 pub(crate) async fn stream<T: DeserializeOwned + Send + 'static>(
-    builder: RequestBuilder,
+    request: ApiRequest,
     max_line_bytes: usize,
 ) -> Result<BoxStream<'static, Result<T>>> {
-    let response = send(builder).await?;
+    let response = send(request).await?;
     Ok(Box::pin(ndjson(response, max_line_bytes)))
 }
 
