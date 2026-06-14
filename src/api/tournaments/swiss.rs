@@ -3,15 +3,27 @@
 //! Reached through [`LichessClient::swiss`].
 
 use futures_util::stream::BoxStream;
-use reqwest::Method;
+use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 
 use crate::api::gameplay::games::LichessGame;
 use crate::client::LichessClient;
 use crate::config::Host;
-use crate::error::Result;
+use crate::error::{ApiErrorKind, LichessError, Result};
 use crate::http;
 use crate::model::LichessTitle;
+
+/// Reclassifies a `401` from a Swiss edit/schedule request as the distinct
+/// [`ApiErrorKind::SwissUnauthorizedEdit`] ownership rejection — the spec's
+/// `SwissUnauthorisedEdit` response — rather than a generic auth failure.
+fn map_unauthorized_edit(err: LichessError) -> LichessError {
+    match err {
+        LichessError::Api(api) if api.status == StatusCode::UNAUTHORIZED => {
+            LichessError::Api(api.with_kind(ApiErrorKind::SwissUnauthorizedEdit))
+        }
+        other => other,
+    }
+}
 
 /// Form body for creating a swiss tournament.
 #[derive(Debug, Serialize)]
@@ -105,7 +117,9 @@ impl<'a> SwissApi<'a> {
     /// Manually schedules the next round.
     /// `POST /api/swiss/{id}/schedule-next-round`
     pub async fn schedule_next_round(&self, id: &str) -> Result<()> {
-        self.post_action(id, "schedule-next-round").await
+        self.post_action(id, "schedule-next-round")
+            .await
+            .map_err(map_unauthorized_edit)
     }
 
     /// Downloads the tournament in TRF format. `GET /swiss/{id}.trf`
@@ -199,7 +213,8 @@ impl<'a> CreateSwissRequest<'a> {
 
     /// Creates or updates the tournament.
     pub async fn send(self) -> Result<LichessSwiss> {
-        let path = if self.edit {
+        let edit = self.edit;
+        let path = if edit {
             format!("/api/swiss/{}/edit", http::segment(self.target_id))
         } else {
             format!("/api/swiss/new/{}", http::segment(self.target_id))
@@ -208,7 +223,12 @@ impl<'a> CreateSwissRequest<'a> {
             .client
             .request(Method::POST, Host::Default, &path)
             .form(&self.form);
-        http::json(request, "LichessSwiss").await
+        let result = http::json(request, "LichessSwiss").await;
+        if edit {
+            result.map_err(map_unauthorized_edit)
+        } else {
+            result
+        }
     }
 }
 
@@ -317,6 +337,25 @@ pub struct LichessSwissResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::ApiError;
+
+    #[test]
+    fn maps_401_to_swiss_unauthorized_edit() {
+        let err = LichessError::Api(ApiError::new(StatusCode::UNAUTHORIZED, None, None));
+        match map_unauthorized_edit(err) {
+            LichessError::Api(api) => assert_eq!(api.kind, ApiErrorKind::SwissUnauthorizedEdit),
+            other => panic!("expected Api error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn leaves_non_401_errors_unchanged() {
+        let err = LichessError::Api(ApiError::new(StatusCode::NOT_FOUND, None, None));
+        match map_unauthorized_edit(err) {
+            LichessError::Api(api) => assert_eq!(api.kind, ApiErrorKind::NotFound),
+            other => panic!("expected Api error, got {other:?}"),
+        }
+    }
 
     #[test]
     fn parses_swiss_with_next_round() {

@@ -2,6 +2,7 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
+use litchee::error::{ApiErrorKind, LichessError};
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -49,6 +50,27 @@ async fn create_posts_to_team_path_with_clock() {
         .unwrap();
 
     assert_eq!(swiss.id, "new1");
+}
+
+#[tokio::test]
+async fn create_401_stays_generic_unauthorized() {
+    // Only edit/schedule remap 401 to SwissUnauthorizedEdit; create must not.
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/swiss/new/coders"))
+        .respond_with(ResponseTemplate::new(401).set_body_string(r#"{"error":"x"}"#))
+        .mount(&server)
+        .await;
+    let err = client(&server)
+        .swiss()
+        .create("coders", 300, 0, 7)
+        .send()
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        LichessError::Api(api) if api.kind == ApiErrorKind::Unauthorized
+    ));
 }
 
 #[tokio::test]
@@ -115,6 +137,55 @@ async fn edit_posts_to_edit_path() {
         .await
         .unwrap();
     assert_eq!(swiss.id, "abc");
+}
+
+#[tokio::test]
+async fn edit_401_maps_to_swiss_unauthorized_edit() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/swiss/abc/edit"))
+        .respond_with(
+            ResponseTemplate::new(401)
+                .set_body_string(r#"{"error":"This user cannot edit this swiss"}"#),
+        )
+        .mount(&server)
+        .await;
+    let err = client(&server)
+        .swiss()
+        .edit("abc", 300, 0, 9)
+        .send()
+        .await
+        .unwrap_err();
+    match err {
+        LichessError::Api(api) => {
+            assert_eq!(api.kind, ApiErrorKind::SwissUnauthorizedEdit);
+            assert_eq!(api.status.as_u16(), 401);
+            assert_eq!(
+                api.message.as_deref(),
+                Some("This user cannot edit this swiss")
+            );
+        }
+        other => panic!("expected Api error, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn schedule_next_round_401_maps_to_swiss_unauthorized_edit() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/swiss/abc/schedule-next-round"))
+        .respond_with(ResponseTemplate::new(401).set_body_string(r#"{"error":"nope"}"#))
+        .mount(&server)
+        .await;
+    let err = client(&server)
+        .swiss()
+        .schedule_next_round("abc")
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        LichessError::Api(api) if api.kind == ApiErrorKind::SwissUnauthorizedEdit
+    ));
 }
 
 #[tokio::test]
