@@ -51,7 +51,7 @@ impl<'a> TvApi<'a> {
         &self,
         channel: &str,
     ) -> Result<BoxStream<'static, Result<LichessTvFeedEvent>>> {
-        let path = format!("/api/tv/{channel}/feed");
+        let path = format!("/api/tv/{}/feed", http::segment(channel));
         self.feed_at(&path).await
     }
 
@@ -63,7 +63,7 @@ impl<'a> TvApi<'a> {
         channel: &str,
         nb: u32,
     ) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/tv/{channel}");
+        let path = format!("/api/tv/{}", http::segment(channel));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)

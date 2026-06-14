@@ -13,6 +13,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
+use crate::secret::Secret;
 
 /// Accessor for the External Engine API.
 #[derive(Debug)]
@@ -37,7 +38,7 @@ impl<'a> ExternalEngineApi<'a> {
 
     /// Gets an external engine by id. `GET /api/external-engine/{id}`
     pub async fn get(&self, id: &str) -> Result<LichessExternalEngine> {
-        let path = format!("/api/external-engine/{id}");
+        let path = format!("/api/external-engine/{}", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessExternalEngine").await
     }
@@ -60,7 +61,7 @@ impl<'a> ExternalEngineApi<'a> {
         id: &str,
         registration: &LichessExternalEngineRegistration,
     ) -> Result<LichessExternalEngine> {
-        let path = format!("/api/external-engine/{id}");
+        let path = format!("/api/external-engine/{}", http::segment(id));
         let request = self
             .client
             .request(Method::PUT, Host::Default, &path)
@@ -70,7 +71,7 @@ impl<'a> ExternalEngineApi<'a> {
 
     /// Deletes an external engine. `DELETE /api/external-engine/{id}`
     pub async fn delete(&self, id: &str) -> Result<()> {
-        let path = format!("/api/external-engine/{id}");
+        let path = format!("/api/external-engine/{}", http::segment(id));
         http::ok(self.client.request(Method::DELETE, Host::Default, &path)).await
     }
 
@@ -84,7 +85,7 @@ impl<'a> ExternalEngineApi<'a> {
         client_secret: &str,
         work: &Value,
     ) -> Result<BoxStream<'static, Result<Value>>> {
-        let path = format!("/api/external-engine/{id}/analyse");
+        let path = format!("/api/external-engine/{}/analyse", http::segment(id));
         let body = serde_json::json!({ "clientSecret": client_secret, "work": work });
         let request = self
             .client
@@ -118,7 +119,7 @@ impl<'a> ExternalEngineApi<'a> {
     ///
     /// `POST /api/external-engine/work/{id}`
     pub async fn submit_work(&self, work_id: &str, output: &str) -> Result<()> {
-        let path = format!("/api/external-engine/work/{work_id}");
+        let path = format!("/api/external-engine/work/{}", http::segment(work_id));
         let request = self
             .client
             .request(Method::POST, Host::Engine, &path)
@@ -137,6 +138,8 @@ impl LichessClient {
 }
 
 /// A registered external engine.
+///
+/// `client_secret` is a [`Secret`], so it is redacted from the [`Debug`] output.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -146,7 +149,7 @@ pub struct LichessExternalEngine {
     /// The engine's display name.
     pub name: String,
     /// The secret used to request analysis from this engine.
-    pub client_secret: String,
+    pub client_secret: Secret<String>,
     /// The user the engine is registered for.
     pub user_id: String,
     /// Maximum number of threads.
@@ -165,6 +168,8 @@ pub struct LichessExternalEngine {
 ///
 /// This is a request input, so it is exhaustive and constructible by callers
 /// (use `..Default::default()` for the optional fields).
+///
+/// `provider_secret` is a [`Secret`], so it is redacted from the [`Debug`] output.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LichessExternalEngineRegistration {
@@ -175,7 +180,7 @@ pub struct LichessExternalEngineRegistration {
     /// Maximum hash table size, in MiB.
     pub max_hash: u32,
     /// A secret shared with the engine provider.
-    pub provider_secret: String,
+    pub provider_secret: Secret<String>,
     /// Default search depth.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_depth: Option<u32>,
@@ -202,12 +207,44 @@ mod tests {
     }
 
     #[test]
+    fn engine_debug_redacts_client_secret() {
+        let engine = LichessExternalEngine {
+            id: "eng".to_owned(),
+            name: "My Engine".to_owned(),
+            client_secret: Secret::new("supersecret".to_owned()),
+            user_id: "u".to_owned(),
+            max_threads: 8,
+            max_hash: 256,
+            variants: vec!["chess".to_owned()],
+            provider_data: None,
+        };
+        let debug = format!("{engine:?}");
+        assert!(!debug.contains("supersecret"));
+        assert!(debug.contains("<redacted>"));
+        assert!(debug.contains("My Engine"));
+    }
+
+    #[test]
+    fn registration_debug_redacts_provider_secret() {
+        let registration = LichessExternalEngineRegistration {
+            name: "E".to_owned(),
+            max_threads: 4,
+            max_hash: 128,
+            provider_secret: Secret::new("supersecret".to_owned()),
+            ..Default::default()
+        };
+        let debug = format!("{registration:?}");
+        assert!(!debug.contains("supersecret"));
+        assert!(debug.contains("<redacted>"));
+    }
+
+    #[test]
     fn registration_skips_empty_optional_fields() {
         let registration = LichessExternalEngineRegistration {
             name: "E".to_owned(),
             max_threads: 4,
             max_hash: 128,
-            provider_secret: "secret".to_owned(),
+            provider_secret: Secret::new("secret".to_owned()),
             ..Default::default()
         };
         let json = serde_json::to_string(&registration).unwrap();

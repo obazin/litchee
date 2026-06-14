@@ -44,7 +44,7 @@ impl<'a> SwissApi<'a> {
 
     /// Gets a swiss tournament. `GET /api/swiss/{id}`
     pub async fn get(&self, id: &str) -> Result<LichessSwiss> {
-        let path = format!("/api/swiss/{id}");
+        let path = format!("/api/swiss/{}", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessSwiss").await
     }
@@ -110,7 +110,7 @@ impl<'a> SwissApi<'a> {
 
     /// Downloads the tournament in TRF format. `GET /swiss/{id}.trf`
     pub async fn trf(&self, id: &str) -> Result<String> {
-        let path = format!("/swiss/{id}.trf");
+        let path = format!("/swiss/{}.trf", http::segment(id));
         http::text(self.client.request(Method::GET, Host::Default, &path)).await
     }
 
@@ -119,14 +119,14 @@ impl<'a> SwissApi<'a> {
         &self,
         id: &str,
     ) -> Result<BoxStream<'static, Result<LichessSwissResult>>> {
-        let path = format!("/api/swiss/{id}/results");
+        let path = format!("/api/swiss/{}/results", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
 
     /// Streams a swiss tournament's games as NDJSON. `GET /api/swiss/{id}/games`
     pub async fn games(&self, id: &str) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/swiss/{id}/games");
+        let path = format!("/api/swiss/{}/games", http::segment(id));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
@@ -136,7 +136,7 @@ impl<'a> SwissApi<'a> {
 
     /// Issues a no-argument `POST` action on a swiss tournament.
     async fn post_action(&self, id: &str, action: &str) -> Result<()> {
-        let path = format!("/api/swiss/{id}/{action}");
+        let path = format!("/api/swiss/{}/{}", http::segment(id), http::segment(action));
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 }
@@ -200,9 +200,9 @@ impl<'a> CreateSwissRequest<'a> {
     /// Creates or updates the tournament.
     pub async fn send(self) -> Result<LichessSwiss> {
         let path = if self.edit {
-            format!("/api/swiss/{}/edit", self.target_id)
+            format!("/api/swiss/{}/edit", http::segment(self.target_id))
         } else {
-            format!("/api/swiss/new/{}", self.target_id)
+            format!("/api/swiss/new/{}", http::segment(self.target_id))
         };
         let request = self
             .client

@@ -6,7 +6,10 @@
 //! The typed helpers ([`json`], [`text`], [`ok`]) build on it so individual
 //! endpoints stay tiny and inherit consistent error handling.
 
+use std::fmt::Display;
+
 use futures_util::stream::BoxStream;
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use reqwest::header::{HeaderMap, RETRY_AFTER};
 use reqwest::{RequestBuilder, Response};
 use serde::Deserialize;
@@ -19,6 +22,24 @@ use crate::stream::ndjson;
 #[derive(Debug, Deserialize)]
 struct ErrorBody {
     error: String,
+}
+
+/// Characters left literal in a path segment: the RFC 3986 unreserved set
+/// (`A-Z a-z 0-9 - . _ ~`). Everything else — including `/ ? # %` — is encoded.
+const PATH_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
+
+/// Percent-encodes a single URL path segment.
+///
+/// Caller-supplied path parameters (usernames, ids, slugs) must go through this
+/// so a value containing `/`, `?`, `#`, or `..` cannot reshape the request path.
+/// Returns a [`Display`] adapter so it can be written straight into a `format!`
+/// without an intermediate `String` allocation.
+pub(crate) fn segment(value: &str) -> impl Display + '_ {
+    utf8_percent_encode(value, PATH_SEGMENT)
 }
 
 /// Sends a request, mapping any non-success status to a typed error.
@@ -116,5 +137,19 @@ mod tests {
     #[test]
     fn missing_retry_after_is_none() {
         assert_eq!(retry_after_secs(&HeaderMap::new()), None);
+    }
+
+    #[test]
+    fn segment_encodes_path_breaking_characters() {
+        assert_eq!(segment("../a").to_string(), "..%2Fa");
+        assert_eq!(segment("a/b").to_string(), "a%2Fb");
+        assert_eq!(segment("a?b#c").to_string(), "a%3Fb%23c");
+        assert_eq!(segment("a b%c").to_string(), "a%20b%25c");
+    }
+
+    #[test]
+    fn segment_leaves_unreserved_characters_intact() {
+        assert_eq!(segment("normal-id_1.x~").to_string(), "normal-id_1.x~");
+        assert_eq!(segment("Lichess123").to_string(), "Lichess123");
     }
 }

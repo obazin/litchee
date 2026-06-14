@@ -30,7 +30,7 @@ impl<'a> UsersApi<'a> {
     ///
     /// `GET /api/user/{username}`
     pub async fn get(&self, username: &str) -> Result<LichessUserExtended> {
-        let path = format!("/api/user/{username}");
+        let path = format!("/api/user/{}", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessUserExtended").await
     }
@@ -68,7 +68,11 @@ impl<'a> UsersApi<'a> {
         user2: &str,
         matchup: bool,
     ) -> Result<LichessCrosstable> {
-        let path = format!("/api/crosstable/{user1}/{user2}");
+        let path = format!(
+            "/api/crosstable/{}/{}",
+            http::segment(user1),
+            http::segment(user2)
+        );
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
@@ -91,7 +95,7 @@ impl<'a> UsersApi<'a> {
     ///
     /// `GET /api/user/{username}/rating-history`
     pub async fn rating_history(&self, username: &str) -> Result<Vec<LichessRatingHistoryEntry>> {
-        let path = format!("/api/user/{username}/rating-history");
+        let path = format!("/api/user/{}/rating-history", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "Vec<LichessRatingHistoryEntry>").await
     }
@@ -100,7 +104,11 @@ impl<'a> UsersApi<'a> {
     ///
     /// `GET /api/user/{username}/perf/{perf}`
     pub async fn perf_stats(&self, username: &str, perf: &str) -> Result<LichessPerfStat> {
-        let path = format!("/api/user/{username}/perf/{perf}");
+        let path = format!(
+            "/api/user/{}/perf/{}",
+            http::segment(username),
+            http::segment(perf)
+        );
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessPerfStat").await
     }
@@ -109,7 +117,7 @@ impl<'a> UsersApi<'a> {
     ///
     /// `GET /api/user/{username}/activity`
     pub async fn activity(&self, username: &str) -> Result<Vec<LichessActivity>> {
-        let path = format!("/api/user/{username}/activity");
+        let path = format!("/api/user/{}/activity", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "Vec<LichessActivity>").await
     }
@@ -126,7 +134,7 @@ impl<'a> UsersApi<'a> {
     ///
     /// `GET /api/player/top/{nb}/{perfType}`
     pub async fn top(&self, perf: &str, nb: u32) -> Result<LichessLeaderboard> {
-        let path = format!("/api/player/top/{nb}/{perf}");
+        let path = format!("/api/player/top/{nb}/{}", http::segment(perf));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
@@ -144,14 +152,14 @@ impl<'a> UsersApi<'a> {
 
     /// Reads the private notes about a user. `GET /api/user/{username}/note`
     pub async fn notes(&self, username: &str) -> Result<Vec<LichessUserNote>> {
-        let path = format!("/api/user/{username}/note");
+        let path = format!("/api/user/{}/note", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "Vec<LichessUserNote>").await
     }
 
     /// Writes a private note about a user. `POST /api/user/{username}/note`
     pub async fn write_note(&self, username: &str, text: &str) -> Result<()> {
-        let path = format!("/api/user/{username}/note");
+        let path = format!("/api/user/{}/note", http::segment(username));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)

@@ -9,6 +9,7 @@ use rand::distributions::Alphanumeric;
 use sha2::{Digest, Sha256};
 
 use crate::error::PkceError;
+use crate::secret::REDACTED;
 
 /// Length of a generated verifier (within the RFC 7636 range of `43..=128`).
 const GENERATED_LEN: usize = 64;
@@ -64,7 +65,7 @@ impl PkceVerifier {
 
 impl fmt::Debug for PkceVerifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("PkceVerifier").field(&"<redacted>").finish()
+        f.debug_tuple("PkceVerifier").field(&REDACTED).finish()
     }
 }
 

@@ -55,7 +55,7 @@ impl<'a> PuzzlesApi<'a> {
 
     /// Gets a puzzle by id. `GET /api/puzzle/{id}`
     pub async fn get(&self, id: &str) -> Result<LichessPuzzleAndGame> {
-        let path = format!("/api/puzzle/{id}");
+        let path = format!("/api/puzzle/{}", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessPuzzleAndGame").await
     }
@@ -99,7 +99,7 @@ impl<'a> PuzzlesApi<'a> {
     ///
     /// `GET /api/puzzle/batch/{angle}`
     pub async fn batch(&self, angle: &str, nb: u32) -> Result<LichessPuzzleBatch> {
-        let path = format!("/api/puzzle/batch/{angle}");
+        let path = format!("/api/puzzle/batch/{}", http::segment(angle));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
@@ -115,7 +115,7 @@ impl<'a> PuzzlesApi<'a> {
         angle: &str,
         solutions: &[LichessPuzzleSolution],
     ) -> Result<LichessPuzzleBatch> {
-        let path = format!("/api/puzzle/batch/{angle}");
+        let path = format!("/api/puzzle/batch/{}", http::segment(angle));
         let body = serde_json::json!({ "solutions": solutions });
         let request = self
             .client
@@ -128,6 +128,7 @@ impl<'a> PuzzlesApi<'a> {
     ///
     /// `GET /api/puzzle/dashboard/{days}`
     pub async fn dashboard(&self, days: u32) -> Result<LichessPuzzleDashboard> {
+        // `days` is numeric, so it needs no percent-encoding (see `http::segment`).
         let path = format!("/api/puzzle/dashboard/{days}");
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessPuzzleDashboard").await
@@ -137,7 +138,7 @@ impl<'a> PuzzlesApi<'a> {
     ///
     /// `GET /api/puzzle/replay/{days}/{theme}`
     pub async fn replay(&self, days: u32, theme: &str) -> Result<LichessPuzzleReplay> {
-        let path = format!("/api/puzzle/replay/{days}/{theme}");
+        let path = format!("/api/puzzle/replay/{days}/{}", http::segment(theme));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessPuzzleReplay").await
     }
@@ -146,14 +147,14 @@ impl<'a> PuzzlesApi<'a> {
     ///
     /// `GET /api/storm/dashboard/{username}`
     pub async fn storm_dashboard(&self, username: &str) -> Result<LichessStormDashboard> {
-        let path = format!("/api/storm/dashboard/{username}");
+        let path = format!("/api/storm/dashboard/{}", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessStormDashboard").await
     }
 
     /// Gets a puzzle race by id. `GET /api/racer/{id}`
     pub async fn racer(&self, id: &str) -> Result<LichessPuzzleRacer> {
-        let path = format!("/api/racer/{id}");
+        let path = format!("/api/racer/{}", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessPuzzleRacer").await
     }

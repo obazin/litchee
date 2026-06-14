@@ -8,6 +8,8 @@
 
 use url::Url;
 
+use crate::secret::Secret;
+
 /// The crate's default `User-Agent`, e.g. `litchee/0.1.0`.
 pub(crate) const DEFAULT_USER_AGENT: &str = concat!("litchee/", env!("CARGO_PKG_VERSION"));
 
@@ -38,6 +40,9 @@ pub(crate) enum Host {
 /// Base URLs are stored without a trailing slash so a path with a leading slash
 /// can be appended directly.
 ///
+/// The `token` is a [`Secret`], so it is redacted from the [`Debug`] output and
+/// cannot leak through logs that format the client or its builder.
+///
 /// [`LichessClient`]: crate::LichessClient
 #[derive(Debug, Clone)]
 pub(crate) struct Config {
@@ -45,7 +50,7 @@ pub(crate) struct Config {
     explorer_base: String,
     tablebase_base: String,
     engine_base: String,
-    pub(crate) token: Option<String>,
+    pub(crate) token: Option<Secret<String>>,
     pub(crate) user_agent: String,
 }
 
@@ -114,6 +119,26 @@ mod tests {
             config.url(Host::Engine, "/api/external-engine/work"),
             "https://engine.lichess.ovh/api/external-engine/work"
         );
+    }
+
+    #[test]
+    fn debug_redacts_the_token() {
+        let config = Config {
+            token: Some(Secret::new("lip_supersecret".to_owned())),
+            ..Default::default()
+        };
+        let debug = format!("{config:?}");
+        assert!(!debug.contains("lip_supersecret"));
+        assert!(debug.contains("<redacted>"));
+        // Non-secret fields stay visible.
+        assert!(debug.contains("litchee/"));
+        assert!(debug.contains("https://lichess.org"));
+    }
+
+    #[test]
+    fn debug_shows_none_token_as_none() {
+        let debug = format!("{:?}", Config::default());
+        assert!(debug.contains("token: None"));
     }
 
     #[test]

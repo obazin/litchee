@@ -71,7 +71,7 @@ async fn exchange_code_returns_a_token() {
         .await
         .unwrap();
 
-    assert_eq!(token.access_token, "lio_abc");
+    assert_eq!(token.access_token.expose(), "lio_abc");
     assert_eq!(token.token_type, "Bearer");
 }
 

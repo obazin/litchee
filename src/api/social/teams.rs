@@ -13,14 +13,17 @@ use crate::config::Host;
 use crate::error::Result;
 use crate::http;
 use crate::model::{LichessLightUser, LichessUser};
+use crate::secret::Secret;
 
 /// Form body for joining a team.
+///
+/// The entry `password` is a [`Secret`], so it is redacted from [`Debug`].
 #[derive(Debug, Serialize)]
 struct JoinForm<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    password: Option<&'a str>,
+    password: Option<Secret<&'a str>>,
 }
 
 /// Accessor for the Teams API.
@@ -37,7 +40,7 @@ impl<'a> TeamsApi<'a> {
 
     /// Gets a team by id. `GET /api/team/{teamId}`
     pub async fn get(&self, team_id: &str) -> Result<LichessTeam> {
-        let path = format!("/api/team/{team_id}");
+        let path = format!("/api/team/{}", http::segment(team_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessTeam").await
     }
@@ -53,7 +56,7 @@ impl<'a> TeamsApi<'a> {
 
     /// Lists the teams a user belongs to. `GET /api/team/of/{username}`
     pub async fn of_user(&self, username: &str) -> Result<Vec<LichessTeam>> {
-        let path = format!("/api/team/of/{username}");
+        let path = format!("/api/team/of/{}", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "Vec<LichessTeam>").await
     }
@@ -69,7 +72,7 @@ impl<'a> TeamsApi<'a> {
 
     /// Streams the members of a team. `GET /api/team/{teamId}/users`
     pub async fn members(&self, team_id: &str) -> Result<BoxStream<'static, Result<LichessUser>>> {
-        let path = format!("/api/team/{team_id}/users");
+        let path = format!("/api/team/{}/users", http::segment(team_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
@@ -82,29 +85,36 @@ impl<'a> TeamsApi<'a> {
         message: Option<&str>,
         password: Option<&str>,
     ) -> Result<()> {
-        let path = format!("/team/{team_id}/join");
+        let path = format!("/team/{}/join", http::segment(team_id));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .form(&JoinForm { message, password });
+            .form(&JoinForm {
+                message,
+                password: password.map(Secret::new),
+            });
         http::ok(request).await
     }
 
     /// Leaves a team. `POST /team/{teamId}/quit`
     pub async fn quit(&self, team_id: &str) -> Result<()> {
-        let path = format!("/team/{team_id}/quit");
+        let path = format!("/team/{}/quit", http::segment(team_id));
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
     /// Kicks a member from a team. `POST /api/team/{teamId}/kick/{userId}`
     pub async fn kick(&self, team_id: &str, user_id: &str) -> Result<()> {
-        let path = format!("/api/team/{team_id}/kick/{user_id}");
+        let path = format!(
+            "/api/team/{}/kick/{}",
+            http::segment(team_id),
+            http::segment(user_id)
+        );
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
     /// Sends a private message to all members. `POST /team/{teamId}/pm-all`
     pub async fn message_all(&self, team_id: &str, message: &str) -> Result<()> {
-        let path = format!("/team/{team_id}/pm-all");
+        let path = format!("/team/{}/pm-all", http::segment(team_id));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
@@ -114,7 +124,7 @@ impl<'a> TeamsApi<'a> {
 
     /// Lists pending join requests. `GET /api/team/{teamId}/requests`
     pub async fn join_requests(&self, team_id: &str) -> Result<Vec<LichessTeamRequestWithUser>> {
-        let path = format!("/api/team/{team_id}/requests");
+        let path = format!("/api/team/{}/requests", http::segment(team_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "Vec<LichessTeamRequestWithUser>").await
     }
@@ -122,14 +132,22 @@ impl<'a> TeamsApi<'a> {
     /// Accepts a join request.
     /// `POST /api/team/{teamId}/request/{userId}/accept`
     pub async fn accept_request(&self, team_id: &str, user_id: &str) -> Result<()> {
-        let path = format!("/api/team/{team_id}/request/{user_id}/accept");
+        let path = format!(
+            "/api/team/{}/request/{}/accept",
+            http::segment(team_id),
+            http::segment(user_id)
+        );
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
     /// Declines a join request.
     /// `POST /api/team/{teamId}/request/{userId}/decline`
     pub async fn decline_request(&self, team_id: &str, user_id: &str) -> Result<()> {
-        let path = format!("/api/team/{team_id}/request/{user_id}/decline");
+        let path = format!(
+            "/api/team/{}/request/{}/decline",
+            http::segment(team_id),
+            http::segment(user_id)
+        );
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
@@ -139,7 +157,7 @@ impl<'a> TeamsApi<'a> {
         &self,
         team_id: &str,
     ) -> Result<BoxStream<'static, Result<LichessArena>>> {
-        let path = format!("/api/team/{team_id}/arena");
+        let path = format!("/api/team/{}/arena", http::segment(team_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
@@ -150,7 +168,7 @@ impl<'a> TeamsApi<'a> {
         &self,
         team_id: &str,
     ) -> Result<BoxStream<'static, Result<LichessSwiss>>> {
-        let path = format!("/api/team/{team_id}/swiss");
+        let path = format!("/api/team/{}/swiss", http::segment(team_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
@@ -251,6 +269,18 @@ pub struct LichessTeamRequestWithUser {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn join_form_debug_redacts_password() {
+        let form = JoinForm {
+            message: Some("hi"),
+            password: Some(Secret::new("supersecret")),
+        };
+        let debug = format!("{form:?}");
+        assert!(!debug.contains("supersecret"));
+        assert!(debug.contains("<redacted>"));
+        assert!(debug.contains("hi"));
+    }
 
     #[test]
     fn parses_team() {

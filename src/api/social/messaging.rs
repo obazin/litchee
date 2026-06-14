@@ -25,7 +25,7 @@ impl<'a> MessagingApi<'a> {
     ///
     /// Requires the `msg:write` scope. `POST /inbox/{username}`
     pub async fn send(&self, username: &str, text: &str) -> Result<()> {
-        let path = format!("/inbox/{username}");
+        let path = format!("/inbox/{}", http::segment(username));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)

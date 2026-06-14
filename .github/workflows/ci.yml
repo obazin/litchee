@@ -44,3 +44,13 @@ jobs:
         # Only the library affects downstream MSRV; dev-deps (tests/examples)
         # may require a newer toolchain.
         run: cargo check --all-features
+
+  audit:
+    name: Security advisories (cargo audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Audit dependencies for RustSec advisories
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

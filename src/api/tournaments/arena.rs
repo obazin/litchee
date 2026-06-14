@@ -52,7 +52,7 @@ impl<'a> ArenaApi<'a> {
 
     /// Gets full details of a tournament. `GET /api/tournament/{id}`
     pub async fn get(&self, id: &str) -> Result<LichessArenaFull> {
-        let path = format!("/api/tournament/{id}");
+        let path = format!("/api/tournament/{}", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessArenaFull").await
     }
@@ -103,7 +103,7 @@ impl<'a> ArenaApi<'a> {
         team_ids: &[&str],
         nb_leaders: u32,
     ) -> Result<LichessArenaFull> {
-        let path = format!("/api/tournament/team-battle/{id}");
+        let path = format!("/api/tournament/team-battle/{}", http::segment(id));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
@@ -117,7 +117,7 @@ impl<'a> ArenaApi<'a> {
     /// Gets the team standings of a team-battle arena.
     /// `GET /api/tournament/{id}/teams`
     pub async fn teams(&self, id: &str) -> Result<LichessTeamBattleStandings> {
-        let path = format!("/api/tournament/{id}/teams");
+        let path = format!("/api/tournament/{}/teams", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessTeamBattleStandings").await
     }
@@ -128,7 +128,7 @@ impl<'a> ArenaApi<'a> {
         &self,
         username: &str,
     ) -> Result<BoxStream<'static, Result<LichessArena>>> {
-        let path = format!("/api/user/{username}/tournament/created");
+        let path = format!("/api/user/{}/tournament/created", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
@@ -139,26 +139,26 @@ impl<'a> ArenaApi<'a> {
         &self,
         username: &str,
     ) -> Result<BoxStream<'static, Result<LichessArena>>> {
-        let path = format!("/api/user/{username}/tournament/played");
+        let path = format!("/api/user/{}/tournament/played", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
 
     /// Joins a tournament. `POST /api/tournament/{id}/join`
     pub async fn join(&self, id: &str) -> Result<()> {
-        let path = format!("/api/tournament/{id}/join");
+        let path = format!("/api/tournament/{}/join", http::segment(id));
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
     /// Withdraws from a tournament. `POST /api/tournament/{id}/withdraw`
     pub async fn withdraw(&self, id: &str) -> Result<()> {
-        let path = format!("/api/tournament/{id}/withdraw");
+        let path = format!("/api/tournament/{}/withdraw", http::segment(id));
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
     /// Terminates a tournament you created. `POST /api/tournament/{id}/terminate`
     pub async fn terminate(&self, id: &str) -> Result<()> {
-        let path = format!("/api/tournament/{id}/terminate");
+        let path = format!("/api/tournament/{}/terminate", http::segment(id));
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
@@ -167,14 +167,14 @@ impl<'a> ArenaApi<'a> {
         &self,
         id: &str,
     ) -> Result<BoxStream<'static, Result<LichessArenaResult>>> {
-        let path = format!("/api/tournament/{id}/results");
+        let path = format!("/api/tournament/{}/results", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
 
     /// Streams a tournament's games as NDJSON. `GET /api/tournament/{id}/games`
     pub async fn games(&self, id: &str) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/tournament/{id}/games");
+        let path = format!("/api/tournament/{}/games", http::segment(id));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
@@ -240,7 +240,7 @@ impl<'a> CreateArenaRequest<'a> {
     /// Creates or updates the tournament.
     pub async fn send(self) -> Result<LichessArenaFull> {
         let path = match self.id {
-            Some(id) => format!("/api/tournament/{id}"),
+            Some(id) => format!("/api/tournament/{}", http::segment(id)),
             None => "/api/tournament".to_owned(),
         };
         let request = self

@@ -35,7 +35,7 @@ impl<'a> BulkPairingApi<'a> {
 
     /// Gets a bulk pairing by id. `GET /api/bulk-pairing/{id}`
     pub async fn get(&self, id: &str) -> Result<LichessBulkPairing> {
-        let path = format!("/api/bulk-pairing/{id}");
+        let path = format!("/api/bulk-pairing/{}", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessBulkPairing").await
     }
@@ -50,21 +50,21 @@ impl<'a> BulkPairingApi<'a> {
     /// Immediately starts the clocks of a bulk pairing.
     /// `POST /api/bulk-pairing/{id}/start-clocks`
     pub async fn start_clocks(&self, id: &str) -> Result<()> {
-        let path = format!("/api/bulk-pairing/{id}/start-clocks");
+        let path = format!("/api/bulk-pairing/{}/start-clocks", http::segment(id));
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
     /// Cancels (deletes) a bulk pairing that has not started.
     /// `DELETE /api/bulk-pairing/{id}`
     pub async fn delete(&self, id: &str) -> Result<()> {
-        let path = format!("/api/bulk-pairing/{id}");
+        let path = format!("/api/bulk-pairing/{}", http::segment(id));
         http::ok(self.client.request(Method::DELETE, Host::Default, &path)).await
     }
 
     /// Streams the games of a bulk pairing as NDJSON.
     /// `GET /api/bulk-pairing/{id}/games`
     pub async fn games(&self, id: &str) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/bulk-pairing/{id}/games");
+        let path = format!("/api/bulk-pairing/{}/games", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
