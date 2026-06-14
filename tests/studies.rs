@@ -32,6 +32,30 @@ async fn export_study_pgn_returns_text() {
 }
 
 #[tokio::test]
+async fn study_pgn_metadata_reads_last_modified() {
+    let server = MockServer::start().await;
+    Mock::given(method("HEAD"))
+        .and(path("/api/study/WTvnkWAL.pgn"))
+        .respond_with(
+            ResponseTemplate::new(204)
+                .insert_header("Last-Modified", "Tue, 25 Apr 2023 13:23:09 GMT"),
+        )
+        .mount(&server)
+        .await;
+
+    let last_modified = client(&server)
+        .studies()
+        .study_pgn_metadata("WTvnkWAL")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        last_modified.as_deref(),
+        Some("Tue, 25 Apr 2023 13:23:09 GMT")
+    );
+}
+
+#[tokio::test]
 async fn export_chapter_pgn_returns_text() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))

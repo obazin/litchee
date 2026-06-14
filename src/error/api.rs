@@ -33,6 +33,14 @@ impl ApiError {
             message,
         }
     }
+
+    /// Returns the error reclassified to `kind`, preserving the status and
+    /// message. Used by endpoints that give an HTTP status a more specific
+    /// meaning than the status alone conveys.
+    pub(crate) fn with_kind(mut self, kind: ApiErrorKind) -> Self {
+        self.kind = kind;
+        self
+    }
 }
 
 impl fmt::Display for ApiError {
@@ -75,6 +83,10 @@ pub enum ApiErrorKind {
     },
     /// `500`–`599` — a server-side error.
     Server,
+    /// `401` on a Swiss tournament edit/schedule request — the authenticated
+    /// user is not permitted to edit this Swiss (Lichess `SwissUnauthorisedEdit`),
+    /// as opposed to a missing or invalid token ([`Unauthorized`](Self::Unauthorized)).
+    SwissUnauthorizedEdit,
     /// Any other status code not otherwise classified.
     Unexpected(u16),
 }
@@ -112,6 +124,7 @@ impl fmt::Display for ApiErrorKind {
                 retry_after_secs: None,
             } => f.write_str("rate limited"),
             Self::Server => f.write_str("server error"),
+            Self::SwissUnauthorizedEdit => f.write_str("not allowed to edit this swiss"),
             Self::Unexpected(code) => write!(f, "unexpected status {code}"),
         }
     }
@@ -151,6 +164,15 @@ mod tests {
                 retry_after_secs: Some(42)
             }
         );
+    }
+
+    #[test]
+    fn with_kind_reclassifies_but_keeps_status_and_message() {
+        let reclassified = ApiError::new(StatusCode::UNAUTHORIZED, Some("nope".into()), None)
+            .with_kind(ApiErrorKind::SwissUnauthorizedEdit);
+        assert_eq!(reclassified.kind, ApiErrorKind::SwissUnauthorizedEdit);
+        assert_eq!(reclassified.status, StatusCode::UNAUTHORIZED);
+        assert_eq!(reclassified.message.as_deref(), Some("nope"));
     }
 
     #[test]
