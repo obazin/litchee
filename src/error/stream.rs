@@ -17,6 +17,15 @@ pub enum StreamError {
         #[source]
         source: serde_json::Error,
     },
+
+    /// A line exceeded the maximum buffered size without a terminating newline,
+    /// indicating a stalled or malformed stream; the buffer is capped to avoid
+    /// unbounded memory growth.
+    #[error("streamed line exceeded the {max}-byte limit without a newline")]
+    LineTooLong {
+        /// The maximum line length, in bytes.
+        max: usize,
+    },
 }
 
 impl StreamError {

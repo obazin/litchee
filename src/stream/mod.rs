@@ -11,6 +11,11 @@ use serde::de::DeserializeOwned;
 
 use crate::error::{Result, StreamError};
 
+/// Maximum bytes buffered for a single in-progress line. A line longer than this
+/// without a newline is treated as a malformed/stalled stream rather than grown
+/// without bound. Generous enough never to reject a legitimate Lichess line.
+const MAX_LINE_BYTES: usize = 16 * 1024 * 1024;
+
 /// Accumulates response bytes and yields complete `\n`-terminated lines.
 ///
 /// Kept separate from the async machinery so the splitting logic is unit
@@ -38,6 +43,11 @@ impl LineSplitter {
     /// Returns any trailing bytes not terminated by a newline.
     fn finish(self) -> Option<Vec<u8>> {
         (!self.buffer.is_empty()).then_some(self.buffer)
+    }
+
+    /// Whether the buffered (still unterminated) line exceeds `max` bytes.
+    fn overflowed(&self, max: usize) -> bool {
+        self.buffer.len() > max
     }
 }
 
@@ -70,6 +80,9 @@ where
                     yield item;
                 }
             }
+            if splitter.overflowed(MAX_LINE_BYTES) {
+                Err(StreamError::LineTooLong { max: MAX_LINE_BYTES })?;
+            }
         }
         // Flatten the trailing-line logic into a single `if let`: let-chains
         // (Rust 2024) aren't usable here because `async_stream` parses this body
@@ -97,6 +110,18 @@ mod tests {
         assert_eq!(splitter.next_line(), Some(b"{\"b\":2}".to_vec()));
         assert_eq!(splitter.next_line(), None);
         assert_eq!(splitter.finish(), None);
+    }
+
+    #[test]
+    fn overflowed_only_when_unterminated_buffer_exceeds_max() {
+        let mut splitter = LineSplitter::default();
+        splitter.push(b"abcde");
+        assert!(!splitter.overflowed(5));
+        assert!(splitter.overflowed(4));
+        // A completed line is drained, so it does not count toward the cap.
+        splitter.push(b"\n");
+        let _ = splitter.next_line();
+        assert!(!splitter.overflowed(0));
     }
 
     #[test]
