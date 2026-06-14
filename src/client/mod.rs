@@ -12,6 +12,17 @@ use crate::secret::Secret;
 
 /// Default connection timeout applied to the built-in HTTP client.
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+/// Default read timeout: the maximum gap between received bytes before a
+/// connection is treated as stalled. `reqwest` resets it after each successful
+/// read, so it bounds stalls without capping total stream duration.
+///
+/// Set conservatively at 5 minutes: long enough that even a quiet long-lived
+/// stream (whose keep-alive cadence the API does not formally guarantee) is
+/// never cut off, while still recovering from a genuinely dead connection.
+/// Callers wanting faster failure can lower it via [`read_timeout`].
+///
+/// [`read_timeout`]: LichessClientBuilder::read_timeout
+const DEFAULT_READ_TIMEOUT: Duration = Duration::from_mins(5);
 
 /// An asynchronous handle to the Lichess API.
 ///
@@ -66,6 +77,11 @@ impl LichessClient {
     pub(crate) fn absolute_url(&self, host: Host, path: &str) -> String {
         self.config.url(host, path)
     }
+
+    /// The configured maximum buffered NDJSON line length, in bytes.
+    pub(crate) fn max_line_bytes(&self) -> usize {
+        self.config.max_line_bytes
+    }
 }
 
 impl Default for LichessClient {
@@ -84,6 +100,7 @@ pub struct LichessClientBuilder {
     config: Config,
     http: Option<reqwest::Client>,
     connect_timeout: Option<Duration>,
+    read_timeout: Option<Duration>,
 }
 
 impl LichessClientBuilder {
@@ -110,8 +127,9 @@ impl LichessClientBuilder {
 
     /// Supplies a pre-configured `reqwest::Client` (proxies, timeouts, …).
     ///
-    /// When set, the [`connect_timeout`](Self::connect_timeout) is ignored —
-    /// configure timeouts on your own client instead.
+    /// When set, the [`connect_timeout`](Self::connect_timeout) and
+    /// [`read_timeout`](Self::read_timeout) are ignored — configure timeouts on
+    /// your own client instead.
     #[must_use]
     pub fn http_client(mut self, http: reqwest::Client) -> Self {
         self.http = Some(http);
@@ -126,6 +144,30 @@ impl LichessClientBuilder {
     #[must_use]
     pub fn connect_timeout(mut self, timeout: Duration) -> Self {
         self.connect_timeout = Some(timeout);
+        self
+    }
+
+    /// Sets the read timeout for the built-in HTTP client (default 5 minutes).
+    ///
+    /// This bounds the gap between received bytes, not the total request time,
+    /// so a stalled connection is detected while healthy long-lived streams
+    /// (which receive periodic keep-alives) keep running. Ignored if a custom
+    /// client is supplied via [`http_client`](Self::http_client).
+    #[must_use]
+    pub fn read_timeout(mut self, timeout: Duration) -> Self {
+        self.read_timeout = Some(timeout);
+        self
+    }
+
+    /// Sets the maximum bytes buffered for a single NDJSON line (default 16 MiB).
+    ///
+    /// A streaming response whose line exceeds this without a newline fails with
+    /// [`StreamError::LineTooLong`](crate::error::StreamError::LineTooLong),
+    /// bounding memory against a malformed or stalled stream. Raise it for an
+    /// endpoint with unusually large lines, or lower it to tighten the budget.
+    #[must_use]
+    pub fn max_line_bytes(mut self, max: usize) -> Self {
+        self.config.max_line_bytes = max;
         self
     }
 
@@ -173,6 +215,7 @@ impl LichessClientBuilder {
             None => reqwest::Client::builder()
                 .user_agent(&self.config.user_agent)
                 .connect_timeout(self.connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT))
+                .read_timeout(self.read_timeout.unwrap_or(DEFAULT_READ_TIMEOUT))
                 .build()?,
         };
         Ok(LichessClient {
@@ -185,6 +228,23 @@ impl LichessClientBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn builds_with_custom_read_timeout() {
+        let client = LichessClient::builder()
+            .read_timeout(Duration::from_secs(10))
+            .build();
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn max_line_bytes_setter_overrides_the_default() {
+        let client = LichessClient::builder()
+            .max_line_bytes(1024)
+            .build()
+            .unwrap();
+        assert_eq!(client.max_line_bytes(), 1024);
+    }
 
     #[test]
     fn builds_with_token_and_connect_timeout() {

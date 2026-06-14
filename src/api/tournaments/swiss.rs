@@ -135,7 +135,7 @@ impl<'a> SwissApi<'a> {
     ) -> Result<BoxStream<'static, Result<LichessSwissResult>>> {
         let path = format!("/api/swiss/{}/results", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams a swiss tournament's games as NDJSON. `GET /api/swiss/{id}/games`
@@ -145,7 +145,7 @@ impl<'a> SwissApi<'a> {
             .client
             .request(Method::GET, Host::Default, &path)
             .header(reqwest::header::ACCEPT, "application/x-ndjson");
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Issues a no-argument `POST` action on a swiss tournament.

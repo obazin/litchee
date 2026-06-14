@@ -105,12 +105,14 @@ pub(crate) async fn ok(builder: RequestBuilder) -> Result<()> {
 /// The initial request (and thus any HTTP error) is resolved before the stream
 /// is returned; per-line decode failures surface as items in the stream. The
 /// stream is boxed (and thus `Unpin`) so callers can consume it directly with
-/// [`StreamExt::next`](futures_util::StreamExt::next).
+/// [`StreamExt::next`](futures_util::StreamExt::next). `max_line_bytes` bounds a
+/// single buffered NDJSON line (see [`ndjson`](crate::stream::ndjson)).
 pub(crate) async fn stream<T: DeserializeOwned + Send + 'static>(
     builder: RequestBuilder,
+    max_line_bytes: usize,
 ) -> Result<BoxStream<'static, Result<T>>> {
     let response = send(builder).await?;
-    Ok(Box::pin(ndjson(response)))
+    Ok(Box::pin(ndjson(response, max_line_bytes)))
 }
 
 #[cfg(test)]

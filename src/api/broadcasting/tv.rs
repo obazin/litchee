@@ -69,13 +69,13 @@ impl<'a> TvApi<'a> {
             .request(Method::GET, Host::Default, &path)
             .header(ACCEPT, NDJSON)
             .query(&[("nb", nb)]);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Opens a TV feed stream at the given path.
     async fn feed_at(&self, path: &str) -> Result<BoxStream<'static, Result<LichessTvFeedEvent>>> {
         let request = self.client.request(Method::GET, Host::Default, path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 }
 

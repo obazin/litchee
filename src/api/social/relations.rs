@@ -30,7 +30,7 @@ impl<'a> RelationsApi<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/rel/following");
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Follows a player. `POST /api/rel/follow/{username}`

@@ -92,7 +92,7 @@ impl<'a> PuzzlesApi<'a> {
             .client
             .request(Method::GET, Host::Default, "/api/puzzle/activity")
             .query(&ActivityQuery { max });
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Gets a batch of puzzles for the given angle (theme/opening).

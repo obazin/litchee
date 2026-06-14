@@ -39,6 +39,11 @@ impl LineSplitter {
     fn finish(self) -> Option<Vec<u8>> {
         (!self.buffer.is_empty()).then_some(self.buffer)
     }
+
+    /// Whether the buffered (still unterminated) line exceeds `max` bytes.
+    fn overflowed(&self, max: usize) -> bool {
+        self.buffer.len() > max
+    }
 }
 
 /// Parses one NDJSON line. Blank/whitespace-only lines (keep-alives) yield
@@ -54,7 +59,14 @@ fn parse_line<T: DeserializeOwned>(line: &[u8]) -> Result<Option<T>> {
 }
 
 /// Converts an NDJSON response body into a stream of decoded `T` values.
-pub(crate) fn ndjson<T>(response: reqwest::Response) -> impl Stream<Item = Result<T>>
+///
+/// `max_line_bytes` caps a single in-progress (unterminated) line as a guard
+/// against unbounded memory growth on a malformed or stalled stream; exceeding
+/// it yields [`StreamError::LineTooLong`].
+pub(crate) fn ndjson<T>(
+    response: reqwest::Response,
+    max_line_bytes: usize,
+) -> impl Stream<Item = Result<T>>
 where
     T: DeserializeOwned,
 {
@@ -69,6 +81,9 @@ where
                 if let Some(item) = parse_line(&line)? {
                     yield item;
                 }
+            }
+            if splitter.overflowed(max_line_bytes) {
+                Err(StreamError::LineTooLong { max: max_line_bytes })?;
             }
         }
         // Flatten the trailing-line logic into a single `if let`: let-chains
@@ -97,6 +112,18 @@ mod tests {
         assert_eq!(splitter.next_line(), Some(b"{\"b\":2}".to_vec()));
         assert_eq!(splitter.next_line(), None);
         assert_eq!(splitter.finish(), None);
+    }
+
+    #[test]
+    fn overflowed_only_when_unterminated_buffer_exceeds_max() {
+        let mut splitter = LineSplitter::default();
+        splitter.push(b"abcde");
+        assert!(!splitter.overflowed(5));
+        assert!(splitter.overflowed(4));
+        // A completed line is drained, so it does not count toward the cap.
+        splitter.push(b"\n");
+        let _ = splitter.next_line();
+        assert!(!splitter.overflowed(0));
     }
 
     #[test]

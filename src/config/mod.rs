@@ -21,6 +21,8 @@ const EXPLORER_BASE: &str = "https://explorer.lichess.org";
 const TABLEBASE_BASE: &str = "https://tablebase.lichess.org";
 /// Default base URL for the external-engine host.
 const ENGINE_BASE: &str = "https://engine.lichess.ovh";
+/// Default cap on a single buffered NDJSON line (see [`Config::max_line_bytes`]).
+pub(crate) const DEFAULT_MAX_LINE_BYTES: usize = 16 * 1024 * 1024;
 
 /// One of the hosts the Lichess API is served from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +54,10 @@ pub(crate) struct Config {
     engine_base: String,
     pub(crate) token: Option<Secret<String>>,
     pub(crate) user_agent: String,
+    /// Maximum bytes buffered for a single NDJSON line before the stream errors
+    /// with [`StreamError::LineTooLong`](crate::error::StreamError::LineTooLong),
+    /// a guard against unbounded memory growth on a malformed/stalled stream.
+    pub(crate) max_line_bytes: usize,
 }
 
 impl Default for Config {
@@ -63,6 +69,7 @@ impl Default for Config {
             engine_base: ENGINE_BASE.to_owned(),
             token: None,
             user_agent: DEFAULT_USER_AGENT.to_owned(),
+            max_line_bytes: DEFAULT_MAX_LINE_BYTES,
         }
     }
 }

@@ -46,7 +46,7 @@ impl<'a> BotApi<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/bot/online");
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams the state of a bot game.
@@ -58,7 +58,7 @@ impl<'a> BotApi<'a> {
     ) -> Result<BoxStream<'static, Result<LichessBoardEvent>>> {
         let path = format!("/api/bot/game/stream/{}", http::segment(game_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Makes a move (optionally offering or agreeing to a draw).
@@ -142,7 +142,7 @@ impl<'a> BotApi<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/stream/event");
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Reads the player chat of a bot game. `GET /api/bot/game/{gameId}/chat`

@@ -32,7 +32,7 @@ impl<'a> BroadcastsApi<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/broadcast");
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Gets the top broadcasts (active, upcoming, past). `GET /api/broadcast/top`
@@ -59,7 +59,7 @@ impl<'a> BroadcastsApi<'a> {
     ) -> Result<BoxStream<'static, Result<LichessBroadcast>>> {
         let path = format!("/api/broadcast/by/{}", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams the authenticated user's broadcast rounds.
@@ -68,7 +68,7 @@ impl<'a> BroadcastsApi<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/broadcast/my-rounds");
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Gets a broadcast tournament with its rounds.

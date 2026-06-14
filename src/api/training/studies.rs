@@ -73,7 +73,7 @@ impl<'a> StudiesApi<'a> {
     ) -> Result<BoxStream<'static, Result<LichessStudyMetadata>>> {
         let path = format!("/api/study/by/{}", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Imports PGN as one or more chapters of a study.

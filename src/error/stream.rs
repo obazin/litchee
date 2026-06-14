@@ -17,6 +17,16 @@ pub enum StreamError {
         #[source]
         source: serde_json::Error,
     },
+
+    /// A single line exceeded the configured buffer limit without a terminating
+    /// newline. This is a deliberate guard against unbounded memory growth on a
+    /// malformed or stalled stream — not a parse error; the limit is tunable via
+    /// [`LichessClientBuilder::max_line_bytes`](crate::LichessClientBuilder::max_line_bytes).
+    #[error("streamed line exceeded the {max}-byte limit without a newline")]
+    LineTooLong {
+        /// The configured maximum line length, in bytes.
+        max: usize,
+    },
 }
 
 impl StreamError {

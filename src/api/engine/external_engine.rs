@@ -91,7 +91,7 @@ impl<'a> ExternalEngineApi<'a> {
             .client
             .request(Method::POST, Host::Engine, &path)
             .json(&body);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Acquires a unit of analysis work as an engine provider, or `None` if
