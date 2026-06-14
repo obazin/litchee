@@ -128,6 +128,7 @@ impl<'a> PuzzlesApi<'a> {
     ///
     /// `GET /api/puzzle/dashboard/{days}`
     pub async fn dashboard(&self, days: u32) -> Result<LichessPuzzleDashboard> {
+        // `days` is numeric, so it needs no percent-encoding (see `http::segment`).
         let path = format!("/api/puzzle/dashboard/{days}");
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessPuzzleDashboard").await

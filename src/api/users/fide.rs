@@ -27,6 +27,7 @@ impl<'a> FideApi<'a> {
     ///
     /// `GET /api/fide/player/{playerId}`
     pub async fn get(&self, player_id: u32) -> Result<LichessFidePlayer> {
+        // `player_id` is numeric, so it needs no percent-encoding (see `http::segment`).
         let path = format!("/api/fide/player/{player_id}");
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessFidePlayer").await
