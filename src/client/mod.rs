@@ -87,6 +87,12 @@ pub struct LichessClientBuilder {
 
 impl LichessClientBuilder {
     /// Sets the `OAuth2` / personal access token sent as a bearer token.
+    ///
+    /// # Security
+    /// The token is sent on every request to the configured hosts. The defaults
+    /// are HTTPS; if you override a host to a non-TLS (`http://`) URL via
+    /// [`base_url`](Self::base_url) (or the other `*_url` setters), the token is
+    /// transmitted unencrypted. Only do so over a trusted channel.
     #[must_use]
     pub fn token(mut self, token: impl Into<String>) -> Self {
         self.config.token = Some(token.into());
@@ -123,6 +129,12 @@ impl LichessClientBuilder {
     }
 
     /// Overrides the main host (`lichess.org`).
+    ///
+    /// # Security
+    /// Intended for localhost, self-hosted instances, or pointing tests at a
+    /// mock server. If you pass a non-TLS (`http://`) URL while a
+    /// [`token`](Self::token) is set, the bearer token is sent unencrypted —
+    /// only do this over a trusted channel.
     #[must_use]
     pub fn base_url(mut self, url: &Url) -> Self {
         self.config.set_base(Host::Default, url);
