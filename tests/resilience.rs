@@ -33,10 +33,13 @@ async fn read_timeout_aborts_a_stalled_response() {
 
     let err = client.account().profile().await.unwrap_err();
 
-    assert!(
-        matches!(err, LichessError::Transport(_)),
-        "expected a transport timeout, got {err:?}"
-    );
+    match err {
+        // Assert it is specifically a timeout, not just any transport failure.
+        LichessError::Transport(source) => {
+            assert!(source.is_timeout(), "expected a timeout, got {source:?}");
+        }
+        other => panic!("expected a transport timeout, got {other:?}"),
+    }
 }
 
 #[tokio::test]

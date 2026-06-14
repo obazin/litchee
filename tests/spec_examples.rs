@@ -36,7 +36,12 @@ async fn account_profile_decodes_spec_example() {
     )
     .await;
     let me = client(&server).account().profile().await.unwrap();
+    // Assert nested fields too, so a DTO that drops/renames one is caught
+    // (serde ignores unknown fields, so a bare id check would not notice).
     assert!(!me.user.id.is_empty());
+    assert!(!me.url.is_empty());
+    assert!(me.user.perfs.is_some(), "perfs should decode");
+    assert!(me.count.is_some(), "count should decode");
 }
 
 #[tokio::test]
@@ -50,6 +55,8 @@ async fn user_public_data_decodes_spec_example() {
     .await;
     let user = client(&server).users().get("anyone").await.unwrap();
     assert!(!user.user.id.is_empty());
+    assert!(!user.user.username.is_empty());
+    assert!(user.user.perfs.is_some(), "perfs should decode");
 }
 
 #[tokio::test]
@@ -67,6 +74,10 @@ async fn game_decodes_spec_example() {
         .await
         .unwrap();
     assert!(!game.id.is_empty());
+    assert!(game.moves.is_some(), "moves should decode");
+    assert!(game.status.is_some(), "status should decode");
+    // `players.white`/`black` are non-optional, so this also exercises their decode.
+    assert!(game.players.is_some(), "players should decode");
 }
 
 #[tokio::test]
@@ -80,6 +91,8 @@ async fn team_decodes_spec_example() {
     .await;
     let team = client(&server).teams().get("anyteam").await.unwrap();
     assert!(!team.id.is_empty());
+    assert!(!team.name.is_empty());
+    assert!(team.leader.is_some(), "leader should decode");
 }
 
 #[tokio::test]
@@ -91,6 +104,8 @@ async fn puzzle_decodes_spec_example() {
         include_str!("fixtures/puzzle_by_id.json"),
     )
     .await;
-    // Decoding success is the assertion; a malformed DTO would panic on unwrap.
-    let _puzzle = client(&server).puzzles().get("anypuzzle").await.unwrap();
+    let puzzle = client(&server).puzzles().get("anypuzzle").await.unwrap();
+    // Exercise both nested objects, not just non-panic.
+    assert!(!puzzle.puzzle.id.is_empty(), "puzzle.id should decode");
+    assert!(!puzzle.game.id.is_empty(), "game.id should decode");
 }
