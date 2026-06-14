@@ -14,10 +14,15 @@ use crate::secret::Secret;
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 /// Default read timeout: the maximum gap between received bytes before a
 /// connection is treated as stalled. `reqwest` resets it after each successful
-/// read, so it bounds stalls without capping total stream duration. Chosen well
-/// above Lichess's observed stream keep-alive cadence (~every few seconds, sent
-/// as blank NDJSON lines) so healthy long-lived streams are never cut off.
-const DEFAULT_READ_TIMEOUT: Duration = Duration::from_mins(1);
+/// read, so it bounds stalls without capping total stream duration.
+///
+/// Set conservatively at 5 minutes: long enough that even a quiet long-lived
+/// stream (whose keep-alive cadence the API does not formally guarantee) is
+/// never cut off, while still recovering from a genuinely dead connection.
+/// Callers wanting faster failure can lower it via [`read_timeout`].
+///
+/// [`read_timeout`]: LichessClientBuilder::read_timeout
+const DEFAULT_READ_TIMEOUT: Duration = Duration::from_mins(5);
 
 /// An asynchronous handle to the Lichess API.
 ///
@@ -137,7 +142,7 @@ impl LichessClientBuilder {
         self
     }
 
-    /// Sets the read timeout for the built-in HTTP client (default 60s).
+    /// Sets the read timeout for the built-in HTTP client (default 5 minutes).
     ///
     /// This bounds the gap between received bytes, not the total request time,
     /// so a stalled connection is detected while healthy long-lived streams
