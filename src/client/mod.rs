@@ -12,6 +12,12 @@ use crate::secret::Secret;
 
 /// Default connection timeout applied to the built-in HTTP client.
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+/// Default read timeout: the maximum gap between received bytes before a
+/// connection is treated as stalled. `reqwest` resets it after each successful
+/// read, so it bounds stalls without capping total stream duration. Chosen well
+/// above Lichess's observed stream keep-alive cadence (~every few seconds, sent
+/// as blank NDJSON lines) so healthy long-lived streams are never cut off.
+const DEFAULT_READ_TIMEOUT: Duration = Duration::from_mins(1);
 
 /// An asynchronous handle to the Lichess API.
 ///
@@ -84,6 +90,7 @@ pub struct LichessClientBuilder {
     config: Config,
     http: Option<reqwest::Client>,
     connect_timeout: Option<Duration>,
+    read_timeout: Option<Duration>,
 }
 
 impl LichessClientBuilder {
@@ -110,8 +117,9 @@ impl LichessClientBuilder {
 
     /// Supplies a pre-configured `reqwest::Client` (proxies, timeouts, …).
     ///
-    /// When set, the [`connect_timeout`](Self::connect_timeout) is ignored —
-    /// configure timeouts on your own client instead.
+    /// When set, the [`connect_timeout`](Self::connect_timeout) and
+    /// [`read_timeout`](Self::read_timeout) are ignored — configure timeouts on
+    /// your own client instead.
     #[must_use]
     pub fn http_client(mut self, http: reqwest::Client) -> Self {
         self.http = Some(http);
@@ -126,6 +134,18 @@ impl LichessClientBuilder {
     #[must_use]
     pub fn connect_timeout(mut self, timeout: Duration) -> Self {
         self.connect_timeout = Some(timeout);
+        self
+    }
+
+    /// Sets the read timeout for the built-in HTTP client (default 60s).
+    ///
+    /// This bounds the gap between received bytes, not the total request time,
+    /// so a stalled connection is detected while healthy long-lived streams
+    /// (which receive periodic keep-alives) keep running. Ignored if a custom
+    /// client is supplied via [`http_client`](Self::http_client).
+    #[must_use]
+    pub fn read_timeout(mut self, timeout: Duration) -> Self {
+        self.read_timeout = Some(timeout);
         self
     }
 
@@ -173,6 +193,7 @@ impl LichessClientBuilder {
             None => reqwest::Client::builder()
                 .user_agent(&self.config.user_agent)
                 .connect_timeout(self.connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT))
+                .read_timeout(self.read_timeout.unwrap_or(DEFAULT_READ_TIMEOUT))
                 .build()?,
         };
         Ok(LichessClient {
@@ -185,6 +206,14 @@ impl LichessClientBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn builds_with_custom_read_timeout() {
+        let client = LichessClient::builder()
+            .read_timeout(Duration::from_secs(10))
+            .build();
+        assert!(client.is_ok());
+    }
 
     #[test]
     fn builds_with_token_and_connect_timeout() {
