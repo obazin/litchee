@@ -3,6 +3,8 @@
 //! Reached through [`LichessClient::external_engine`]. The analysis/work
 //! endpoints are served from `engine.lichess.ovh`.
 
+use std::fmt;
+
 use futures_util::stream::BoxStream;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::{Method, StatusCode};
@@ -137,7 +139,9 @@ impl LichessClient {
 }
 
 /// A registered external engine.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// The [`Debug`] output redacts `client_secret`.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct LichessExternalEngine {
@@ -161,11 +165,28 @@ pub struct LichessExternalEngine {
     pub provider_data: Option<String>,
 }
 
+impl fmt::Debug for LichessExternalEngine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LichessExternalEngine")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("client_secret", &"<redacted>")
+            .field("user_id", &self.user_id)
+            .field("max_threads", &self.max_threads)
+            .field("max_hash", &self.max_hash)
+            .field("variants", &self.variants)
+            .field("provider_data", &self.provider_data)
+            .finish()
+    }
+}
+
 /// The registration body for creating or updating an external engine.
 ///
 /// This is a request input, so it is exhaustive and constructible by callers
 /// (use `..Default::default()` for the optional fields).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+///
+/// The [`Debug`] output redacts `provider_secret`.
+#[derive(Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LichessExternalEngineRegistration {
     /// The engine's display name (3–200 characters).
@@ -187,6 +208,20 @@ pub struct LichessExternalEngineRegistration {
     pub provider_data: Option<String>,
 }
 
+impl fmt::Debug for LichessExternalEngineRegistration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LichessExternalEngineRegistration")
+            .field("name", &self.name)
+            .field("max_threads", &self.max_threads)
+            .field("max_hash", &self.max_hash)
+            .field("provider_secret", &"<redacted>")
+            .field("default_depth", &self.default_depth)
+            .field("variants", &self.variants)
+            .field("provider_data", &self.provider_data)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,6 +234,38 @@ mod tests {
         assert_eq!(engine.id, "eng");
         assert_eq!(engine.max_threads, 8);
         assert_eq!(engine.variants, vec!["chess"]);
+    }
+
+    #[test]
+    fn engine_debug_redacts_client_secret() {
+        let engine = LichessExternalEngine {
+            id: "eng".to_owned(),
+            name: "My Engine".to_owned(),
+            client_secret: "supersecret".to_owned(),
+            user_id: "u".to_owned(),
+            max_threads: 8,
+            max_hash: 256,
+            variants: vec!["chess".to_owned()],
+            provider_data: None,
+        };
+        let debug = format!("{engine:?}");
+        assert!(!debug.contains("supersecret"));
+        assert!(debug.contains("<redacted>"));
+        assert!(debug.contains("My Engine"));
+    }
+
+    #[test]
+    fn registration_debug_redacts_provider_secret() {
+        let registration = LichessExternalEngineRegistration {
+            name: "E".to_owned(),
+            max_threads: 4,
+            max_hash: 128,
+            provider_secret: "supersecret".to_owned(),
+            ..Default::default()
+        };
+        let debug = format!("{registration:?}");
+        assert!(!debug.contains("supersecret"));
+        assert!(debug.contains("<redacted>"));
     }
 
     #[test]
