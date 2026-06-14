@@ -3,8 +3,6 @@
 //! Reached through [`LichessClient::external_engine`]. The analysis/work
 //! endpoints are served from `engine.lichess.ovh`.
 
-use std::fmt;
-
 use futures_util::stream::BoxStream;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::{Method, StatusCode};
@@ -15,6 +13,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
+use crate::secret::Secret;
 
 /// Accessor for the External Engine API.
 #[derive(Debug)]
@@ -140,8 +139,8 @@ impl LichessClient {
 
 /// A registered external engine.
 ///
-/// The [`Debug`] output redacts `client_secret`.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// `client_secret` is a [`Secret`], so it is redacted from the [`Debug`] output.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct LichessExternalEngine {
@@ -150,7 +149,7 @@ pub struct LichessExternalEngine {
     /// The engine's display name.
     pub name: String,
     /// The secret used to request analysis from this engine.
-    pub client_secret: String,
+    pub client_secret: Secret<String>,
     /// The user the engine is registered for.
     pub user_id: String,
     /// Maximum number of threads.
@@ -165,28 +164,13 @@ pub struct LichessExternalEngine {
     pub provider_data: Option<String>,
 }
 
-impl fmt::Debug for LichessExternalEngine {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LichessExternalEngine")
-            .field("id", &self.id)
-            .field("name", &self.name)
-            .field("client_secret", &"<redacted>")
-            .field("user_id", &self.user_id)
-            .field("max_threads", &self.max_threads)
-            .field("max_hash", &self.max_hash)
-            .field("variants", &self.variants)
-            .field("provider_data", &self.provider_data)
-            .finish()
-    }
-}
-
 /// The registration body for creating or updating an external engine.
 ///
 /// This is a request input, so it is exhaustive and constructible by callers
 /// (use `..Default::default()` for the optional fields).
 ///
-/// The [`Debug`] output redacts `provider_secret`.
-#[derive(Clone, Default, PartialEq, Eq, Serialize)]
+/// `provider_secret` is a [`Secret`], so it is redacted from the [`Debug`] output.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LichessExternalEngineRegistration {
     /// The engine's display name (3–200 characters).
@@ -196,7 +180,7 @@ pub struct LichessExternalEngineRegistration {
     /// Maximum hash table size, in MiB.
     pub max_hash: u32,
     /// A secret shared with the engine provider.
-    pub provider_secret: String,
+    pub provider_secret: Secret<String>,
     /// Default search depth.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_depth: Option<u32>,
@@ -206,20 +190,6 @@ pub struct LichessExternalEngineRegistration {
     /// Arbitrary provider bookkeeping data.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_data: Option<String>,
-}
-
-impl fmt::Debug for LichessExternalEngineRegistration {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LichessExternalEngineRegistration")
-            .field("name", &self.name)
-            .field("max_threads", &self.max_threads)
-            .field("max_hash", &self.max_hash)
-            .field("provider_secret", &"<redacted>")
-            .field("default_depth", &self.default_depth)
-            .field("variants", &self.variants)
-            .field("provider_data", &self.provider_data)
-            .finish()
-    }
 }
 
 #[cfg(test)]
@@ -241,7 +211,7 @@ mod tests {
         let engine = LichessExternalEngine {
             id: "eng".to_owned(),
             name: "My Engine".to_owned(),
-            client_secret: "supersecret".to_owned(),
+            client_secret: Secret::new("supersecret".to_owned()),
             user_id: "u".to_owned(),
             max_threads: 8,
             max_hash: 256,
@@ -260,7 +230,7 @@ mod tests {
             name: "E".to_owned(),
             max_threads: 4,
             max_hash: 128,
-            provider_secret: "supersecret".to_owned(),
+            provider_secret: Secret::new("supersecret".to_owned()),
             ..Default::default()
         };
         let debug = format!("{registration:?}");
@@ -274,7 +244,7 @@ mod tests {
             name: "E".to_owned(),
             max_threads: 4,
             max_hash: 128,
-            provider_secret: "secret".to_owned(),
+            provider_secret: Secret::new("secret".to_owned()),
             ..Default::default()
         };
         let json = serde_json::to_string(&registration).unwrap();

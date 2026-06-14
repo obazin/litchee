@@ -8,6 +8,7 @@ use url::Url;
 
 use crate::config::{Config, Host};
 use crate::error::Result;
+use crate::secret::Secret;
 
 /// Default connection timeout applied to the built-in HTTP client.
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -53,7 +54,7 @@ impl LichessClient {
         let url = self.config.url(host, path);
         let builder = self.http.request(method, url);
         match &self.config.token {
-            Some(token) => builder.bearer_auth(token),
+            Some(token) => builder.bearer_auth(token.expose()),
             None => builder,
         }
     }
@@ -95,7 +96,7 @@ impl LichessClientBuilder {
     /// transmitted unencrypted. Only do so over a trusted channel.
     #[must_use]
     pub fn token(mut self, token: impl Into<String>) -> Self {
-        self.config.token = Some(token.into());
+        self.config.token = Some(Secret::new(token.into()));
         self
     }
 

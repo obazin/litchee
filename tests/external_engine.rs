@@ -2,6 +2,7 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
+use litchee::Secret;
 use litchee::api::engine::external_engine::LichessExternalEngineRegistration;
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -60,7 +61,7 @@ async fn update_puts_json_registration() {
         name: "My Engine".to_owned(),
         max_threads: 8,
         max_hash: 256,
-        provider_secret: "secret".to_owned(),
+        provider_secret: Secret::new("secret".to_owned()),
         ..Default::default()
     };
     let engine = client(&server)
@@ -135,7 +136,7 @@ async fn create_posts_json_registration() {
         name: "My Engine".to_owned(),
         max_threads: 8,
         max_hash: 256,
-        provider_secret: "secret".to_owned(),
+        provider_secret: Secret::new("secret".to_owned()),
         ..Default::default()
     };
     let engine = client(&server)

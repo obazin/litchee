@@ -2,8 +2,6 @@
 //!
 //! Reached through [`LichessClient::teams`].
 
-use std::fmt;
-
 use futures_util::stream::BoxStream;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
@@ -15,25 +13,17 @@ use crate::config::Host;
 use crate::error::Result;
 use crate::http;
 use crate::model::{LichessLightUser, LichessUser};
+use crate::secret::Secret;
 
 /// Form body for joining a team.
 ///
-/// The [`Debug`] output redacts the entry `password`.
-#[derive(Serialize)]
+/// The entry `password` is a [`Secret`], so it is redacted from [`Debug`].
+#[derive(Debug, Serialize)]
 struct JoinForm<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    password: Option<&'a str>,
-}
-
-impl fmt::Debug for JoinForm<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("JoinForm")
-            .field("message", &self.message)
-            .field("password", &self.password.map(|_| "<redacted>"))
-            .finish()
-    }
+    password: Option<Secret<&'a str>>,
 }
 
 /// Accessor for the Teams API.
@@ -99,7 +89,10 @@ impl<'a> TeamsApi<'a> {
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .form(&JoinForm { message, password });
+            .form(&JoinForm {
+                message,
+                password: password.map(Secret::new),
+            });
         http::ok(request).await
     }
 
@@ -281,7 +274,7 @@ mod tests {
     fn join_form_debug_redacts_password() {
         let form = JoinForm {
             message: Some("hi"),
-            password: Some("supersecret"),
+            password: Some(Secret::new("supersecret")),
         };
         let debug = format!("{form:?}");
         assert!(!debug.contains("supersecret"));

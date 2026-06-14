@@ -6,9 +6,9 @@
 //! a request targets; [`Config`] holds the resolved base URLs plus the token
 //! and user agent.
 
-use std::fmt;
-
 use url::Url;
+
+use crate::secret::Secret;
 
 /// The crate's default `User-Agent`, e.g. `litchee/0.1.0`.
 pub(crate) const DEFAULT_USER_AGENT: &str = concat!("litchee/", env!("CARGO_PKG_VERSION"));
@@ -40,17 +40,17 @@ pub(crate) enum Host {
 /// Base URLs are stored without a trailing slash so a path with a leading slash
 /// can be appended directly.
 ///
-/// The `token` is redacted from the [`Debug`] output so it cannot leak through
-/// logs that format the client or its builder.
+/// The `token` is a [`Secret`], so it is redacted from the [`Debug`] output and
+/// cannot leak through logs that format the client or its builder.
 ///
 /// [`LichessClient`]: crate::LichessClient
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct Config {
     default_base: String,
     explorer_base: String,
     tablebase_base: String,
     engine_base: String,
-    pub(crate) token: Option<String>,
+    pub(crate) token: Option<Secret<String>>,
     pub(crate) user_agent: String,
 }
 
@@ -64,19 +64,6 @@ impl Default for Config {
             token: None,
             user_agent: DEFAULT_USER_AGENT.to_owned(),
         }
-    }
-}
-
-impl fmt::Debug for Config {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Config")
-            .field("default_base", &self.default_base)
-            .field("explorer_base", &self.explorer_base)
-            .field("tablebase_base", &self.tablebase_base)
-            .field("engine_base", &self.engine_base)
-            .field("token", &self.token.as_ref().map(|_| "<redacted>"))
-            .field("user_agent", &self.user_agent)
-            .finish()
     }
 }
 
@@ -137,7 +124,7 @@ mod tests {
     #[test]
     fn debug_redacts_the_token() {
         let config = Config {
-            token: Some("lip_supersecret".to_owned()),
+            token: Some(Secret::new("lip_supersecret".to_owned())),
             ..Default::default()
         };
         let debug = format!("{config:?}");
