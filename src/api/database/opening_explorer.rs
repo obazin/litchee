@@ -81,7 +81,7 @@ impl<'a> OpeningExplorerApi<'a> {
 
     /// Downloads a master game as PGN. `GET /masters/pgn/{gameId}`
     pub async fn masters_pgn(&self, game_id: &str) -> Result<String> {
-        let path = format!("/masters/pgn/{game_id}");
+        let path = format!("/masters/pgn/{}", http::segment(game_id));
         let request = self
             .client
             .request(Method::GET, Host::OpeningExplorer, &path);

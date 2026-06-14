@@ -738,6 +738,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-util",
+ "percent-encoding",
  "rand 0.8.6",
  "reqwest",
  "serde",

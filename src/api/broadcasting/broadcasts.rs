@@ -57,7 +57,7 @@ impl<'a> BroadcastsApi<'a> {
         &self,
         username: &str,
     ) -> Result<BoxStream<'static, Result<LichessBroadcast>>> {
-        let path = format!("/api/broadcast/by/{username}");
+        let path = format!("/api/broadcast/by/{}", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
@@ -74,7 +74,7 @@ impl<'a> BroadcastsApi<'a> {
     /// Gets a broadcast tournament with its rounds.
     /// `GET /api/broadcast/{broadcastTournamentId}`
     pub async fn get_tournament(&self, tournament_id: &str) -> Result<LichessBroadcast> {
-        let path = format!("/api/broadcast/{tournament_id}");
+        let path = format!("/api/broadcast/{}", http::segment(tournament_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessBroadcast").await
     }
@@ -87,35 +87,43 @@ impl<'a> BroadcastsApi<'a> {
         round_slug: &str,
         round_id: &str,
     ) -> Result<LichessBroadcastRoundView> {
-        let path = format!("/api/broadcast/{tour_slug}/{round_slug}/{round_id}");
+        let path = format!(
+            "/api/broadcast/{}/{}/{}",
+            http::segment(tour_slug),
+            http::segment(round_slug),
+            http::segment(round_id)
+        );
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessBroadcastRoundView").await
     }
 
     /// Exports a round as PGN. `GET /api/broadcast/round/{roundId}.pgn`
     pub async fn round_pgn(&self, round_id: &str) -> Result<String> {
-        let path = format!("/api/broadcast/round/{round_id}.pgn");
+        let path = format!("/api/broadcast/round/{}.pgn", http::segment(round_id));
         http::text(self.client.request(Method::GET, Host::Default, &path)).await
     }
 
     /// Exports all rounds of a tournament as PGN.
     /// `GET /api/broadcast/{broadcastTournamentId}.pgn`
     pub async fn all_rounds_pgn(&self, tournament_id: &str) -> Result<String> {
-        let path = format!("/api/broadcast/{tournament_id}.pgn");
+        let path = format!("/api/broadcast/{}.pgn", http::segment(tournament_id));
         http::text(self.client.request(Method::GET, Host::Default, &path)).await
     }
 
     /// Streams a round's PGN as games are updated (text; stays open while the
     /// round is live). `GET /api/stream/broadcast/round/{roundId}.pgn`
     pub async fn stream_round_pgn(&self, round_id: &str) -> Result<String> {
-        let path = format!("/api/stream/broadcast/round/{round_id}.pgn");
+        let path = format!(
+            "/api/stream/broadcast/round/{}.pgn",
+            http::segment(round_id)
+        );
         http::text(self.client.request(Method::GET, Host::Default, &path)).await
     }
 
     /// Pushes PGN games to a round.
     /// `POST /api/broadcast/round/{roundId}/push`
     pub async fn push_pgn(&self, round_id: &str, pgn: &str) -> Result<LichessBroadcastPushResult> {
-        let path = format!("/api/broadcast/round/{round_id}/push");
+        let path = format!("/api/broadcast/round/{}/push", http::segment(round_id));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
@@ -127,13 +135,13 @@ impl<'a> BroadcastsApi<'a> {
     /// Resets a round, removing all its games.
     /// `POST /api/broadcast/round/{roundId}/reset`
     pub async fn reset_round(&self, round_id: &str) -> Result<()> {
-        let path = format!("/api/broadcast/round/{round_id}/reset");
+        let path = format!("/api/broadcast/round/{}/reset", http::segment(round_id));
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
     /// Lists the players of a broadcast. `GET /broadcast/{id}/players`
     pub async fn players(&self, tournament_id: &str) -> Result<Vec<LichessBroadcastPlayerEntry>> {
-        let path = format!("/broadcast/{tournament_id}/players");
+        let path = format!("/broadcast/{}/players", http::segment(tournament_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "Vec<LichessBroadcastPlayerEntry>").await
     }
@@ -145,7 +153,11 @@ impl<'a> BroadcastsApi<'a> {
         tournament_id: &str,
         player_id: &str,
     ) -> Result<LichessBroadcastPlayerEntry> {
-        let path = format!("/broadcast/{tournament_id}/players/{player_id}");
+        let path = format!(
+            "/broadcast/{}/players/{}",
+            http::segment(tournament_id),
+            http::segment(player_id)
+        );
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessBroadcastPlayerEntry").await
     }
@@ -156,7 +168,10 @@ impl<'a> BroadcastsApi<'a> {
         &self,
         tournament_id: &str,
     ) -> Result<Vec<LichessBroadcastPlayerEntry>> {
-        let path = format!("/broadcast/{tournament_id}/teams/standings");
+        let path = format!(
+            "/broadcast/{}/teams/standings",
+            http::segment(tournament_id)
+        );
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "broadcast team standings").await
     }
@@ -243,7 +258,7 @@ impl<'a> TourRequest<'a> {
     /// Creates or updates the tournament.
     pub async fn send(self) -> Result<LichessBroadcast> {
         let path = match self.edit_id {
-            Some(id) => format!("/broadcast/{id}/edit"),
+            Some(id) => format!("/broadcast/{}/edit", http::segment(id)),
             None => "/broadcast/new".to_owned(),
         };
         let request = self
@@ -311,9 +326,9 @@ impl<'a> RoundRequest<'a> {
     /// Creates or updates the round.
     pub async fn send(self) -> Result<LichessBroadcastRoundView> {
         let path = if self.edit {
-            format!("/broadcast/round/{}/edit", self.target_id)
+            format!("/broadcast/round/{}/edit", http::segment(self.target_id))
         } else {
-            format!("/broadcast/{}/new", self.target_id)
+            format!("/broadcast/{}/new", http::segment(self.target_id))
         };
         let request = self
             .client

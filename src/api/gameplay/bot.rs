@@ -56,7 +56,7 @@ impl<'a> BotApi<'a> {
         &self,
         game_id: &str,
     ) -> Result<BoxStream<'static, Result<LichessBoardEvent>>> {
-        let path = format!("/api/bot/game/stream/{game_id}");
+        let path = format!("/api/bot/game/stream/{}", http::segment(game_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
@@ -70,7 +70,11 @@ impl<'a> BotApi<'a> {
         chess_move: &str,
         offering_draw: bool,
     ) -> Result<()> {
-        let path = format!("/api/bot/game/{game_id}/move/{chess_move}");
+        let path = format!(
+            "/api/bot/game/{}/move/{}",
+            http::segment(game_id),
+            http::segment(chess_move)
+        );
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
@@ -102,21 +106,29 @@ impl<'a> BotApi<'a> {
     /// Accepts or declines a draw offer.
     /// `POST /api/bot/game/{gameId}/draw/{accept}`
     pub async fn handle_draw(&self, game_id: &str, accept: bool) -> Result<()> {
-        let path = format!("/api/bot/game/{game_id}/draw/{}", yes_no(accept));
+        let path = format!(
+            "/api/bot/game/{}/draw/{}",
+            http::segment(game_id),
+            yes_no(accept)
+        );
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
     /// Accepts or declines a takeback proposal.
     /// `POST /api/bot/game/{gameId}/takeback/{accept}`
     pub async fn handle_takeback(&self, game_id: &str, accept: bool) -> Result<()> {
-        let path = format!("/api/bot/game/{game_id}/takeback/{}", yes_no(accept));
+        let path = format!(
+            "/api/bot/game/{}/takeback/{}",
+            http::segment(game_id),
+            yes_no(accept)
+        );
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
     /// Posts a message to the game chat.
     /// `POST /api/bot/game/{gameId}/chat`
     pub async fn write_chat(&self, game_id: &str, room: LichessChatRoom, text: &str) -> Result<()> {
-        let path = format!("/api/bot/game/{game_id}/chat");
+        let path = format!("/api/bot/game/{}/chat", http::segment(game_id));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
@@ -135,14 +147,18 @@ impl<'a> BotApi<'a> {
 
     /// Reads the player chat of a bot game. `GET /api/bot/game/{gameId}/chat`
     pub async fn read_chat(&self, game_id: &str) -> Result<Vec<LichessGameChatMessage>> {
-        let path = format!("/api/bot/game/{game_id}/chat");
+        let path = format!("/api/bot/game/{}/chat", http::segment(game_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "Vec<LichessGameChatMessage>").await
     }
 
     /// Issues a no-argument `POST` action on a bot game.
     async fn post_action(&self, game_id: &str, action: &str) -> Result<()> {
-        let path = format!("/api/bot/game/{game_id}/{action}");
+        let path = format!(
+            "/api/bot/game/{}/{}",
+            http::segment(game_id),
+            http::segment(action)
+        );
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 }

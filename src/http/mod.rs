@@ -7,6 +7,7 @@
 //! endpoints stay tiny and inherit consistent error handling.
 
 use futures_util::stream::BoxStream;
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
 use reqwest::header::{HeaderMap, RETRY_AFTER};
 use reqwest::{RequestBuilder, Response};
 use serde::Deserialize;
@@ -19,6 +20,22 @@ use crate::stream::ndjson;
 #[derive(Debug, Deserialize)]
 struct ErrorBody {
     error: String,
+}
+
+/// Characters left literal in a path segment: the RFC 3986 unreserved set
+/// (`A-Z a-z 0-9 - . _ ~`). Everything else — including `/ ? # %` — is encoded.
+const PATH_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
+
+/// Percent-encodes a single URL path segment.
+///
+/// Caller-supplied path parameters (usernames, ids, slugs) must go through this
+/// so a value containing `/`, `?`, `#`, or `..` cannot reshape the request path.
+pub(crate) fn segment(value: &str) -> String {
+    utf8_percent_encode(value, PATH_SEGMENT).to_string()
 }
 
 /// Sends a request, mapping any non-success status to a typed error.
@@ -116,5 +133,19 @@ mod tests {
     #[test]
     fn missing_retry_after_is_none() {
         assert_eq!(retry_after_secs(&HeaderMap::new()), None);
+    }
+
+    #[test]
+    fn segment_encodes_path_breaking_characters() {
+        assert_eq!(segment("../a"), "..%2Fa");
+        assert_eq!(segment("a/b"), "a%2Fb");
+        assert_eq!(segment("a?b#c"), "a%3Fb%23c");
+        assert_eq!(segment("a b%c"), "a%20b%25c");
+    }
+
+    #[test]
+    fn segment_leaves_unreserved_characters_intact() {
+        assert_eq!(segment("normal-id_1.x~"), "normal-id_1.x~");
+        assert_eq!(segment("Lichess123"), "Lichess123");
     }
 }

@@ -55,7 +55,11 @@ impl<'a> RelationsApi<'a> {
 
     /// Issues a `POST /api/rel/{action}/{username}` relation change.
     async fn post_relation(&self, action: &str, username: &str) -> Result<()> {
-        let path = format!("/api/rel/{action}/{username}");
+        let path = format!(
+            "/api/rel/{}/{}",
+            http::segment(action),
+            http::segment(username)
+        );
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 }

@@ -39,7 +39,7 @@ impl<'a> ExternalEngineApi<'a> {
 
     /// Gets an external engine by id. `GET /api/external-engine/{id}`
     pub async fn get(&self, id: &str) -> Result<LichessExternalEngine> {
-        let path = format!("/api/external-engine/{id}");
+        let path = format!("/api/external-engine/{}", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessExternalEngine").await
     }
@@ -62,7 +62,7 @@ impl<'a> ExternalEngineApi<'a> {
         id: &str,
         registration: &LichessExternalEngineRegistration,
     ) -> Result<LichessExternalEngine> {
-        let path = format!("/api/external-engine/{id}");
+        let path = format!("/api/external-engine/{}", http::segment(id));
         let request = self
             .client
             .request(Method::PUT, Host::Default, &path)
@@ -72,7 +72,7 @@ impl<'a> ExternalEngineApi<'a> {
 
     /// Deletes an external engine. `DELETE /api/external-engine/{id}`
     pub async fn delete(&self, id: &str) -> Result<()> {
-        let path = format!("/api/external-engine/{id}");
+        let path = format!("/api/external-engine/{}", http::segment(id));
         http::ok(self.client.request(Method::DELETE, Host::Default, &path)).await
     }
 
@@ -86,7 +86,7 @@ impl<'a> ExternalEngineApi<'a> {
         client_secret: &str,
         work: &Value,
     ) -> Result<BoxStream<'static, Result<Value>>> {
-        let path = format!("/api/external-engine/{id}/analyse");
+        let path = format!("/api/external-engine/{}/analyse", http::segment(id));
         let body = serde_json::json!({ "clientSecret": client_secret, "work": work });
         let request = self
             .client
@@ -120,7 +120,7 @@ impl<'a> ExternalEngineApi<'a> {
     ///
     /// `POST /api/external-engine/work/{id}`
     pub async fn submit_work(&self, work_id: &str, output: &str) -> Result<()> {
-        let path = format!("/api/external-engine/work/{work_id}");
+        let path = format!("/api/external-engine/work/{}", http::segment(work_id));
         let request = self
             .client
             .request(Method::POST, Host::Engine, &path)

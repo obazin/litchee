@@ -36,20 +36,24 @@ impl<'a> StudiesApi<'a> {
 
     /// Exports one chapter as PGN. `GET /api/study/{studyId}/{chapterId}.pgn`
     pub async fn export_chapter_pgn(&self, study_id: &str, chapter_id: &str) -> Result<String> {
-        let path = format!("/api/study/{study_id}/{chapter_id}.pgn");
+        let path = format!(
+            "/api/study/{}/{}.pgn",
+            http::segment(study_id),
+            http::segment(chapter_id)
+        );
         http::text(self.client.request(Method::GET, Host::Default, &path)).await
     }
 
     /// Exports all chapters of a study as PGN. `GET /api/study/{studyId}.pgn`
     pub async fn export_study_pgn(&self, study_id: &str) -> Result<String> {
-        let path = format!("/api/study/{study_id}.pgn");
+        let path = format!("/api/study/{}.pgn", http::segment(study_id));
         http::text(self.client.request(Method::GET, Host::Default, &path)).await
     }
 
     /// Exports all of a user's studies as PGN.
     /// `GET /api/study/by/{username}/export.pgn`
     pub async fn export_all_pgn(&self, username: &str) -> Result<String> {
-        let path = format!("/api/study/by/{username}/export.pgn");
+        let path = format!("/api/study/by/{}/export.pgn", http::segment(username));
         http::text(self.client.request(Method::GET, Host::Default, &path)).await
     }
 
@@ -58,7 +62,7 @@ impl<'a> StudiesApi<'a> {
         &self,
         username: &str,
     ) -> Result<BoxStream<'static, Result<LichessStudyMetadata>>> {
-        let path = format!("/api/study/by/{username}");
+        let path = format!("/api/study/by/{}", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
@@ -78,7 +82,11 @@ impl<'a> StudiesApi<'a> {
     /// Deletes a chapter from a study.
     /// `DELETE /api/study/{studyId}/{chapterId}`
     pub async fn delete_chapter(&self, study_id: &str, chapter_id: &str) -> Result<()> {
-        let path = format!("/api/study/{study_id}/{chapter_id}");
+        let path = format!(
+            "/api/study/{}/{}",
+            http::segment(study_id),
+            http::segment(chapter_id)
+        );
         http::ok(self.client.request(Method::DELETE, Host::Default, &path)).await
     }
 
@@ -96,7 +104,11 @@ impl<'a> StudiesApi<'a> {
         chapter_id: &str,
         pgn: &str,
     ) -> Result<()> {
-        let path = format!("/api/study/{study_id}/{chapter_id}/moves");
+        let path = format!(
+            "/api/study/{}/{}/moves",
+            http::segment(study_id),
+            http::segment(chapter_id)
+        );
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
@@ -112,7 +124,11 @@ impl<'a> StudiesApi<'a> {
         chapter_id: &str,
         pgn_tags: &str,
     ) -> Result<()> {
-        let path = format!("/api/study/{study_id}/{chapter_id}/tags");
+        let path = format!(
+            "/api/study/{}/{}/tags",
+            http::segment(study_id),
+            http::segment(chapter_id)
+        );
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
@@ -231,7 +247,7 @@ impl<'a> ImportPgnRequest<'a> {
 
     /// Performs the import.
     pub async fn send(self) -> Result<LichessStudyImportResult> {
-        let path = format!("/api/study/{}/import-pgn", self.study_id);
+        let path = format!("/api/study/{}/import-pgn", http::segment(self.study_id));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)

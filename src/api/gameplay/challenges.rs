@@ -38,7 +38,7 @@ impl<'a> ChallengesApi<'a> {
 
     /// Shows a single challenge by id. `GET /api/challenge/{challengeId}/show`
     pub async fn show(&self, challenge_id: &str) -> Result<LichessChallenge> {
-        let path = format!("/api/challenge/{challenge_id}/show");
+        let path = format!("/api/challenge/{}/show", http::segment(challenge_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessChallenge").await
     }
@@ -58,14 +58,14 @@ impl<'a> ChallengesApi<'a> {
     /// Accepts an incoming challenge.
     /// `POST /api/challenge/{challengeId}/accept`
     pub async fn accept(&self, challenge_id: &str) -> Result<()> {
-        let path = format!("/api/challenge/{challenge_id}/accept");
+        let path = format!("/api/challenge/{}/accept", http::segment(challenge_id));
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
     /// Declines an incoming challenge, optionally with a reason key.
     /// `POST /api/challenge/{challengeId}/decline`
     pub async fn decline(&self, challenge_id: &str, reason: Option<&str>) -> Result<()> {
-        let path = format!("/api/challenge/{challenge_id}/decline");
+        let path = format!("/api/challenge/{}/decline", http::segment(challenge_id));
         let mut request = self.client.request(Method::POST, Host::Default, &path);
         if let Some(reason) = reason {
             request = request.form(&[("reason", reason)]);
@@ -76,14 +76,14 @@ impl<'a> ChallengesApi<'a> {
     /// Cancels a challenge you sent.
     /// `POST /api/challenge/{challengeId}/cancel`
     pub async fn cancel(&self, challenge_id: &str) -> Result<()> {
-        let path = format!("/api/challenge/{challenge_id}/cancel");
+        let path = format!("/api/challenge/{}/cancel", http::segment(challenge_id));
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
     /// Adds time to the opponent's clock in an ongoing game.
     /// `POST /api/round/{gameId}/add-time/{seconds}`
     pub async fn add_time(&self, game_id: &str, seconds: u32) -> Result<()> {
-        let path = format!("/api/round/{game_id}/add-time/{seconds}");
+        let path = format!("/api/round/{}/add-time/{seconds}", http::segment(game_id));
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
@@ -97,7 +97,7 @@ impl<'a> ChallengesApi<'a> {
     /// Starts the clocks of a game immediately, using both players' tokens.
     /// `POST /api/challenge/{gameId}/start-clocks`
     pub async fn start_clocks(&self, game_id: &str, token1: &str, token2: &str) -> Result<()> {
-        let path = format!("/api/challenge/{game_id}/start-clocks");
+        let path = format!("/api/challenge/{}/start-clocks", http::segment(game_id));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
@@ -213,7 +213,7 @@ impl<'a> ChallengeRequest<'a> {
 
     /// Sends the challenge.
     pub async fn send(self) -> Result<LichessChallenge> {
-        let path = format!("/api/challenge/{}", self.username);
+        let path = format!("/api/challenge/{}", http::segment(self.username));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)

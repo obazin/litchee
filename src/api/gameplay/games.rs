@@ -50,7 +50,7 @@ impl<'a> GamesApi<'a> {
     ///
     /// `GET /api/user/{username}/current-game`
     pub async fn current_game(&self, username: &str) -> Result<LichessGame> {
-        let path = format!("/api/user/{username}/current-game");
+        let path = format!("/api/user/{}/current-game", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "LichessGame").await
     }
@@ -78,7 +78,7 @@ impl<'a> GamesApi<'a> {
 
     /// Gets the spectator chat of a game. `GET /game/{gameId}/chat`
     pub async fn chat(&self, game_id: &str) -> Result<Vec<LichessGameChatMessage>> {
-        let path = format!("/game/{game_id}/chat");
+        let path = format!("/game/{}/chat", http::segment(game_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "Vec<LichessGameChatMessage>").await
     }
@@ -122,7 +122,7 @@ impl<'a> GamesApi<'a> {
         &self,
         game_id: &str,
     ) -> Result<BoxStream<'static, Result<LichessGameMoveUpdate>>> {
-        let path = format!("/api/stream/game/{game_id}");
+        let path = format!("/api/stream/game/{}", http::segment(game_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::stream(request).await
     }
@@ -148,7 +148,7 @@ impl<'a> GamesApi<'a> {
         stream_id: &str,
         ids: &[&str],
     ) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/stream/games/{stream_id}");
+        let path = format!("/api/stream/games/{}", http::segment(stream_id));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
@@ -160,7 +160,7 @@ impl<'a> GamesApi<'a> {
     /// Adds game ids to an existing game stream.
     /// `POST /api/stream/games/{streamId}/add`
     pub async fn add_to_stream(&self, stream_id: &str, ids: &[&str]) -> Result<()> {
-        let path = format!("/api/stream/games/{stream_id}/add");
+        let path = format!("/api/stream/games/{}/add", http::segment(stream_id));
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
@@ -257,7 +257,7 @@ impl<'a> GameExportRequest<'a> {
 
     /// Executes the export, returning the game as JSON.
     pub async fn json(self) -> Result<LichessGame> {
-        let path = format!("/game/export/{}", self.game_id);
+        let path = format!("/game/export/{}", http::segment(self.game_id));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
@@ -267,7 +267,7 @@ impl<'a> GameExportRequest<'a> {
 
     /// Executes the export, returning the game as a PGN string.
     pub async fn pgn(self) -> Result<String> {
-        let path = format!("/game/export/{}", self.game_id);
+        let path = format!("/game/export/{}", http::segment(self.game_id));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
@@ -377,7 +377,7 @@ impl<'a> UserGamesRequest<'a> {
 
     /// Executes the export, streaming games as decoded JSON values.
     pub async fn stream(self) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/games/user/{}", self.username);
+        let path = format!("/api/games/user/{}", http::segment(self.username));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
@@ -388,7 +388,7 @@ impl<'a> UserGamesRequest<'a> {
 
     /// Executes the export, returning all games as one PGN string.
     pub async fn pgn(self) -> Result<String> {
-        let path = format!("/api/games/user/{}", self.username);
+        let path = format!("/api/games/user/{}", http::segment(self.username));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
