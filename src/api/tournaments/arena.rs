@@ -130,7 +130,7 @@ impl<'a> ArenaApi<'a> {
     ) -> Result<BoxStream<'static, Result<LichessArena>>> {
         let path = format!("/api/user/{}/tournament/created", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams the arenas a user has played (NDJSON).
@@ -141,7 +141,7 @@ impl<'a> ArenaApi<'a> {
     ) -> Result<BoxStream<'static, Result<LichessArena>>> {
         let path = format!("/api/user/{}/tournament/played", http::segment(username));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Joins a tournament. `POST /api/tournament/{id}/join`
@@ -169,7 +169,7 @@ impl<'a> ArenaApi<'a> {
     ) -> Result<BoxStream<'static, Result<LichessArenaResult>>> {
         let path = format!("/api/tournament/{}/results", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams a tournament's games as NDJSON. `GET /api/tournament/{id}/games`
@@ -179,7 +179,7 @@ impl<'a> ArenaApi<'a> {
             .client
             .request(Method::GET, Host::Default, &path)
             .header(reqwest::header::ACCEPT, "application/x-ndjson");
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 }
 

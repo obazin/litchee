@@ -74,7 +74,7 @@ impl<'a> TeamsApi<'a> {
     pub async fn members(&self, team_id: &str) -> Result<BoxStream<'static, Result<LichessUser>>> {
         let path = format!("/api/team/{}/users", http::segment(team_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Joins a team, optionally with a message and entry password.
@@ -159,7 +159,7 @@ impl<'a> TeamsApi<'a> {
     ) -> Result<BoxStream<'static, Result<LichessArena>>> {
         let path = format!("/api/team/{}/arena", http::segment(team_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams the swiss tournaments of a team (NDJSON).
@@ -170,7 +170,7 @@ impl<'a> TeamsApi<'a> {
     ) -> Result<BoxStream<'static, Result<LichessSwiss>>> {
         let path = format!("/api/team/{}/swiss", http::segment(team_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 }
 

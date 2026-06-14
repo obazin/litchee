@@ -77,6 +77,11 @@ impl LichessClient {
     pub(crate) fn absolute_url(&self, host: Host, path: &str) -> String {
         self.config.url(host, path)
     }
+
+    /// The configured maximum buffered NDJSON line length, in bytes.
+    pub(crate) fn max_line_bytes(&self) -> usize {
+        self.config.max_line_bytes
+    }
 }
 
 impl Default for LichessClient {
@@ -154,6 +159,18 @@ impl LichessClientBuilder {
         self
     }
 
+    /// Sets the maximum bytes buffered for a single NDJSON line (default 16 MiB).
+    ///
+    /// A streaming response whose line exceeds this without a newline fails with
+    /// [`StreamError::LineTooLong`](crate::error::StreamError::LineTooLong),
+    /// bounding memory against a malformed or stalled stream. Raise it for an
+    /// endpoint with unusually large lines, or lower it to tighten the budget.
+    #[must_use]
+    pub fn max_line_bytes(mut self, max: usize) -> Self {
+        self.config.max_line_bytes = max;
+        self
+    }
+
     /// Overrides the main host (`lichess.org`).
     ///
     /// # Security
@@ -218,6 +235,15 @@ mod tests {
             .read_timeout(Duration::from_secs(10))
             .build();
         assert!(client.is_ok());
+    }
+
+    #[test]
+    fn max_line_bytes_setter_overrides_the_default() {
+        let client = LichessClient::builder()
+            .max_line_bytes(1024)
+            .build()
+            .unwrap();
+        assert_eq!(client.max_line_bytes(), 1024);
     }
 
     #[test]

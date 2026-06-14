@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
-use litchee::error::LichessError;
+use litchee::error::{LichessError, StreamError};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use wiremock::matchers::{method, path};
@@ -74,4 +74,39 @@ async fn keepalives_within_the_window_keep_a_stream_alive() {
 
     assert_eq!(games.len(), 1);
     assert_eq!(games[0].as_ref().unwrap().id, "g1");
+}
+
+#[tokio::test]
+async fn line_exceeding_max_line_bytes_errors() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/swiss/g1/games"))
+        // One long line with no newline, larger than the configured cap.
+        .respond_with(ResponseTemplate::new(200).set_body_string("a".repeat(64)))
+        .mount(&server)
+        .await;
+
+    let client = LichessClient::builder()
+        .base_url(&server.uri().parse().unwrap())
+        .token("t")
+        .max_line_bytes(16)
+        .build()
+        .unwrap();
+
+    let first = client
+        .swiss()
+        .games("g1")
+        .await
+        .unwrap()
+        .next()
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(
+            first,
+            Err(LichessError::Stream(StreamError::LineTooLong { max: 16 }))
+        ),
+        "expected LineTooLong, got {first:?}"
+    );
 }

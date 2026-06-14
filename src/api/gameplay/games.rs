@@ -94,7 +94,7 @@ impl<'a> GamesApi<'a> {
             .header(ACCEPT, NDJSON)
             .header(CONTENT_TYPE, "text/plain")
             .body(ids.join(","));
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams the authenticated user's bookmarked games (NDJSON).
@@ -104,7 +104,7 @@ impl<'a> GamesApi<'a> {
             .client
             .request(Method::GET, Host::Default, "/api/games/export/bookmarks")
             .header(ACCEPT, NDJSON);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams the authenticated user's imported games (NDJSON).
@@ -114,7 +114,7 @@ impl<'a> GamesApi<'a> {
             .client
             .request(Method::GET, Host::Default, "/api/games/export/imports")
             .header(ACCEPT, NDJSON);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams a game's moves as they are played. `GET /api/stream/game/{id}`
@@ -124,7 +124,7 @@ impl<'a> GamesApi<'a> {
     ) -> Result<BoxStream<'static, Result<LichessGameMoveUpdate>>> {
         let path = format!("/api/stream/game/{}", http::segment(game_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams games played by the given users as they start/finish (NDJSON).
@@ -138,7 +138,7 @@ impl<'a> GamesApi<'a> {
             .request(Method::POST, Host::Default, "/api/stream/games-by-users")
             .header(CONTENT_TYPE, "text/plain")
             .body(usernames.join(","));
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams a custom set of games by id (NDJSON).
@@ -154,7 +154,7 @@ impl<'a> GamesApi<'a> {
             .request(Method::POST, Host::Default, &path)
             .header(CONTENT_TYPE, "text/plain")
             .body(ids.join(","));
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Adds game ids to an existing game stream.
@@ -383,7 +383,7 @@ impl<'a> UserGamesRequest<'a> {
             .request(Method::GET, Host::Default, &path)
             .header(ACCEPT, NDJSON)
             .query(&self.query);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Executes the export, returning all games as one PGN string.

@@ -66,7 +66,7 @@ impl<'a> BulkPairingApi<'a> {
     pub async fn games(&self, id: &str) -> Result<BoxStream<'static, Result<LichessGame>>> {
         let path = format!("/api/bulk-pairing/{}/games", http::segment(id));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 }
 

@@ -45,7 +45,7 @@ impl<'a> BoardApi<'a> {
     ) -> Result<BoxStream<'static, Result<LichessBoardEvent>>> {
         let path = format!("/api/board/game/stream/{}", http::segment(game_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Makes a move (optionally offering or agreeing to a draw).
@@ -136,7 +136,7 @@ impl<'a> BoardApi<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/stream/event");
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Reads the player chat of a board game.
@@ -244,7 +244,7 @@ impl<'a> SeekRequest<'a> {
             .client
             .request(Method::POST, Host::Default, "/api/board/seek")
             .form(&self.form);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 }
 

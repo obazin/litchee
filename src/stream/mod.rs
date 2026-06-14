@@ -11,11 +11,6 @@ use serde::de::DeserializeOwned;
 
 use crate::error::{Result, StreamError};
 
-/// Maximum bytes buffered for a single in-progress line. A line longer than this
-/// without a newline is treated as a malformed/stalled stream rather than grown
-/// without bound. Generous enough never to reject a legitimate Lichess line.
-const MAX_LINE_BYTES: usize = 16 * 1024 * 1024;
-
 /// Accumulates response bytes and yields complete `\n`-terminated lines.
 ///
 /// Kept separate from the async machinery so the splitting logic is unit
@@ -64,7 +59,14 @@ fn parse_line<T: DeserializeOwned>(line: &[u8]) -> Result<Option<T>> {
 }
 
 /// Converts an NDJSON response body into a stream of decoded `T` values.
-pub(crate) fn ndjson<T>(response: reqwest::Response) -> impl Stream<Item = Result<T>>
+///
+/// `max_line_bytes` caps a single in-progress (unterminated) line as a guard
+/// against unbounded memory growth on a malformed or stalled stream; exceeding
+/// it yields [`StreamError::LineTooLong`].
+pub(crate) fn ndjson<T>(
+    response: reqwest::Response,
+    max_line_bytes: usize,
+) -> impl Stream<Item = Result<T>>
 where
     T: DeserializeOwned,
 {
@@ -80,8 +82,8 @@ where
                     yield item;
                 }
             }
-            if splitter.overflowed(MAX_LINE_BYTES) {
-                Err(StreamError::LineTooLong { max: MAX_LINE_BYTES })?;
+            if splitter.overflowed(max_line_bytes) {
+                Err(StreamError::LineTooLong { max: max_line_bytes })?;
             }
         }
         // Flatten the trailing-line logic into a single `if let`: let-chains

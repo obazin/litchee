@@ -76,7 +76,7 @@ impl<'a> OpeningExplorerApi<'a> {
             .client
             .request(Method::GET, Host::OpeningExplorer, "/player")
             .query(&query);
-        http::stream(request).await
+        http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Downloads a master game as PGN. `GET /masters/pgn/{gameId}`
