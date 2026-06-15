@@ -1,0 +1,10 @@
+# The exact Rust toolchain for litchee.
+#
+# The channel matches the crate's MSRV (`rust-version` in Cargo.toml) and the
+# version stated in the README. This single file is the source of truth for the
+# toolchain: it is honored by the Nix dev shell (via fenix `fromToolchainFile`)
+# and by rustup directly, so every environment uses the same Rust.
+[toolchain]
+channel = "1.95.0"
+components = ["rust-src", "clippy", "rustfmt", "rust-analyzer"]
+profile = "minimal"
