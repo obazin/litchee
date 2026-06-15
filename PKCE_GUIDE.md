@@ -254,7 +254,7 @@ Build a **new** client carrying the token, and call the API:
 ```rust
 let user_client = LichessClient::builder()
     .user_agent("my-chess-app/1.0")
-    .token(token.access_token)
+    .token(token.access_token.into_inner())
     .build()?;
 
 // Now authenticated calls work, e.g.:
@@ -336,7 +336,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 6. Use it.
     let user_client = LichessClient::builder()
         .user_agent("my-chess-app/1.0")
-        .token(token.access_token)
+        .token(token.access_token.into_inner())
         .build()?;
     let me = user_client.account().profile().await?;
     println!("Logged in as {}", me.user.username);
@@ -347,7 +347,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 `wait_for_redirect` is the small local HTTP listener you write to capture the
 `code` and `state` query parameters — that part is yours, everything else is
-`litchee`.
+`litchee`. For a complete, runnable version of exactly this (listener included),
+see [`examples/oauth_flow.rs`](examples/oauth_flow.rs):
+`cargo run --example oauth_flow`.
 
 ---
 

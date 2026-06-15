@@ -40,7 +40,7 @@ async fn main() -> litchee::Result<()> {
 
 ## Why litchee?
 
-The Lichess API is large (24 tags, ~190 operations, four hosts, JSON + NDJSON +
+The Lichess API is large (24 tags, ~184 operations, four hosts, JSON + NDJSON +
 PGN). `litchee` wraps all of it behind one cohesive, async-first client so Rust
 applications — bots, analysis tools, "Log in with Lichess" web apps, dataset
 exporters — can talk to Lichess without hand-rolling HTTP, streaming, and OAuth.
@@ -65,7 +65,7 @@ tokio = { version = "1", features = ["full"] }
 futures-util = "0.3" # to consume streams with `.next()`
 ```
 
-The minimum supported Rust version is **1.85** (edition 2024).
+The minimum supported Rust version is **1.95** (edition 2024).
 
 ## Examples
 
@@ -100,7 +100,7 @@ let token = client.oauth().exchange_code(&CodeExchange {
 }).await?;
 
 // 3. Build an authenticated client with the new token.
-let user = LichessClient::builder().token(token.access_token).build()?;
+let user = LichessClient::builder().token(token.access_token.into_inner()).build()?;
 println!("Hello, {}", user.account().profile().await?.user.username);
 # Ok(())
 # }
@@ -197,8 +197,17 @@ if let Some(broadcast) = official.next().await {
 # }
 ```
 
-The [`examples/`](examples/) directory contains runnable programs
-(`cargo run --example profile`, `cargo run --example tv_feed`).
+The [`examples/`](examples/) directory contains runnable programs:
+
+- [`oauth_flow`](examples/oauth_flow.rs) — the **full "Log in with Lichess"
+  flow** end to end: PKCE authorization, opening the browser, catching the
+  redirect on a tiny local listener, exchanging the code, then listing the
+  signed-in user's recent games, puzzle attempts, and studies
+  (`cargo run --example oauth_flow`).
+- [`profile`](examples/profile.rs) — print the authenticated user's profile
+  (`LICHESS_TOKEN=lip_xxx cargo run --example profile`).
+- [`tv_feed`](examples/tv_feed.rs) — stream the Lichess TV feed
+  (`cargo run --example tv_feed`).
 
 ## API coverage
 
@@ -360,6 +369,13 @@ grouped by category. The tables below map each concern's endpoints to its module
   [`LichessError`] variant: a structured `ApiError` (status → typed kind + body
   message + `Retry-After`), a typed `OAuthError`, transport/decode/stream
   failures, and PKCE validation errors.
+- **Resilient by configuration.** Connect/read timeouts are tunable on the
+  builder (the read timeout defaults to 5 minutes so long-lived NDJSON streams
+  aren't killed), the NDJSON line buffer is bounded as a DoS guard
+  (`max_line_bytes`), and rate-limited (`429`) requests can be retried
+  **opt-in** via [`RetryPolicy`] — it waits the response's `Retry-After` when
+  present, otherwise exponential backoff clamped to a ceiling. Tokens are held
+  in a `Secret` wrapper that redacts them from `Debug` output.
 - **Builder pattern.** The client (`LichessClient::builder()`) and every request
   with optional parameters (game export, challenges, tournaments, …) use
   builders rather than wide function signatures.
@@ -381,7 +397,7 @@ grouped by category. The tables below map each concern's endpoints to its module
   splitting, error mapping, serde round-trips) has unit tests. CI runs
   `fmt`, `clippy -D warnings`, the test suite, the doc build, and an MSRV check.
 - **Safety & quality gates.** `#![forbid(unsafe_code)]`, clippy `pedantic`,
-  `missing_docs`, and a self-imposed ≤600 LOC/file and ≤20 LOC/method limit.
+  `missing_docs`, and a self-imposed ≤900 LOC/file and ≤20 LOC/method limit.
 
 ### Project layout
 
@@ -448,3 +464,4 @@ Licensed under the [MIT License](LICENSE).
 
 [Lichess API]: https://lichess.org/api
 [`LichessError`]: https://docs.rs/litchee/latest/litchee/error/enum.LichessError.html
+[`RetryPolicy`]: https://docs.rs/litchee/latest/litchee/struct.RetryPolicy.html
