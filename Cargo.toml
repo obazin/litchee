@@ -3,20 +3,32 @@ name = "litchee"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.95"
-description = "An async, builder-pattern Rust client for the Lichess API with PKCE OAuth support"
-license = "MIT"
+authors = ["Olivier Bazin <olivierbazin.it@gmail.com>"]
+description = "Async, builder-pattern Rust client for the Lichess API: full endpoint coverage, NDJSON streaming, and OAuth2 PKCE ('Log in with Lichess')."
+documentation = "https://docs.rs/litchee"
+homepage = "https://github.com/obazin/litchee"
 repository = "https://github.com/obazin/litchee"
+license = "MIT"
 readme = "README.md"
 keywords = ["lichess", "chess", "api", "client", "oauth"]
-categories = ["api-bindings", "asynchronous"]
-# Keep the published crate lean: ship src + license + readme + changelog only.
+categories = ["api-bindings", "asynchronous", "web-programming::http-client"]
+# Keep the published crate lean: ship src, license, the README + PKCE guide, and
+# the runnable examples. Everything below is dev-only (specs, CI, tooling, Nix
+# shell, internal notes) and is stripped from the package.
 exclude = [
     "/reference",
     "/.github",
     "/.claude",
+    "/.gitignore",
+    "/.gitmodules",
+    "/.envrc",
     "/clippy.toml",
     "/rustfmt.toml",
+    "/flake.nix",
+    "/flake.lock",
+    "/rust-toolchain.toml",
     "/CLAUDE.md",
+    "/todo.md",
 ]
 
 [package.metadata.docs.rs]
