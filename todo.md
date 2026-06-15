@@ -3,32 +3,53 @@
 A practical playbook for locking down and documenting `litchee`'s public API,
 tailored to the current crate. Ordered roughly the way it should be done.
 
-> Tooling note: this project gets its toolchain from a **Nix dev shell**
-> (`flake.nix` → `obazin/chess-flake`'s `rustShell` bundle). Add tools through the
-> bundle's `extra` package list — **not** `cargo install`. The `rustShell`
-> signature is `{ name, extra ? [ ], env ? {}, hook ? "" }`, and the workspace
-> `lib` re-exports `pkgs`, so a tool from the pinned nixpkgs is reachable as
-> `lib.pkgs.<tool>`.
+> Tooling note: this project gets its toolchain from a **self-contained Nix dev
+> shell** (`flake.nix`). It no longer inherits from `obazin/chess-flake`; the
+> Rust toolchain comes from **fenix** and is pinned to the exact version in
+> `rust-toolchain.toml` (currently **1.95.0**, matching the MSRV and README).
+> Add tools by appending to `devShells.default.packages` in `flake.nix` — **not**
+> `cargo install`. Anything in the pinned nixpkgs is reachable as `pkgs.<tool>`.
 >
-> Both `cargo public-api` and `cargo-semver-checks` also need a **nightly rustdoc
-> JSON** toolchain (they invoke nightly themselves). The pinned `rustToolchain`
-> is currently stable, so a nightly rustdoc must be on PATH when these run — fine
-> for tooling/CI even though the crate builds on stable + MSRV 1.95.
+> Nightly requirement for the API tooling (verified 2026-06-15): both
+> `cargo public-api` and `cargo-semver-checks` consume **rustdoc JSON**, which is
+> a **nightly-only** feature. The default shell pins *stable* 1.95.0, and stable
+> rustdoc rejects it (`rustdoc -Z unstable-options --output-format json` →
+> "the option `Z` is only accepted on the nightly compiler"). So these tools
+> cannot run in the default shell as-is.
+>
+> Recommended approach (deferred — implement when starting this audit): add a
+> **separate** `devShells.api-audit` so the default shell stays lean and
+> stable-pinned. Give it a **date-pinned** fenix nightly (deterministic) plus the
+> tools, then run `nix develop .#api-audit --command cargo public-api`:
+>
+> ```nix
+> devShells.api-audit = pkgs.mkShell {
+>   packages = [
+>     (fenix.packages.${system}.toolchainOf {
+>       channel = "nightly";
+>       date = "2026-06-01";        # pin a known-good nightly
+>       sha256 = "sha256-…";        # discover via a placeholder hash, as for stable
+>     }).toolchain
+>     pkgs.cargo-public-api          # 0.52.0 in the pinned nixpkgs
+>     pkgs.cargo-semver-checks
+>   ];
+> };
+> ```
+>
+> Gotcha: the nightly's rustdoc-JSON **format version must match** what
+> `cargo-public-api` expects — that's why the nightly is *date-pinned* rather than
+> `latest`, to lock a known-good pairing. The `RUSTC_BOOTSTRAP=1` trick (coercing
+> stable rustdoc to emit JSON) works occasionally but is fragile across versions;
+> prefer the pinned nightly.
 
 ---
 
 ## 1. See exactly what's public today
 
-- [ ] Add `cargo-public-api` to the dev flake's `extra` list (verified present
-      in the pinned nixpkgs as **0.50.1** — no new flake input / `flake.lock`
-      change needed):
-      ```nix
-      default = lib.bundles.rustShell {
-        name = "litchee";
-        extra = [ lib.pkgs.cargo-public-api ];
-      };
-      ```
-      Confirm with `nix develop --command cargo public-api --version`.
+- [ ] Stand up the `api-audit` shell (see the tooling note above) with a pinned
+      fenix nightly + `cargo-public-api` (verified present in the pinned nixpkgs
+      as **0.52.0** — no new flake input needed). Confirm with
+      `nix develop .#api-audit --command cargo public-api --version`.
 - [ ] `cargo public-api` — prints every public item, fully qualified.
 - [ ] Read it as a checklist. The bulk comes from `pub mod api` (every concern
       module + every `Lichess*` DTO + every builder), plus the root re-exports
@@ -67,9 +88,9 @@ tailored to the current crate. Ordered roughly the way it should be done.
       CI step (`cargo public-api diff tests/public-api.txt`) that fails on any
       change — forcing a conscious golden-file update + changelog entry.
 - [ ] **Semver linting** (catches *breaking* changes): add `cargo-semver-checks`
-      to the dev flake's `extra` list (`extra = [ lib.pkgs.cargo-semver-checks ];`),
-      same mechanism as `cargo-public-api` above — not `cargo install`. Then add
-      `cargo semver-checks check-release` as a release-gate CI job.
+      to the `api-audit` shell alongside `cargo-public-api` (it needs the same
+      nightly rustdoc JSON — see the tooling note above), not `cargo install`.
+      Then add `cargo semver-checks check-release` as a release-gate CI job.
 
 ## 5. Documentation completeness
 
