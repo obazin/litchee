@@ -1,0 +1,46 @@
+# Dependabot configuration — version updates.
+#
+# This file controls *version* update PRs. Security (advisory-driven) updates are
+# enabled separately in the repo's Settings → Code security → Dependabot, and do
+# not need an entry here. Note that CI already fails on RustSec advisories via the
+# `audit` job (rustsec/audit-check) in ci.yml, so this is complementary, not a
+# duplicate.
+version: 2
+updates:
+  # Crate dependencies (Cargo.toml / Cargo.lock).
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Match the repo's conventional-commit convention (see CLAUDE.md).
+    commit-message:
+      prefix: chore
+    groups:
+      # Roll routine minor/patch bumps into a single PR to keep the noise down;
+      # major bumps still arrive as individual PRs so they can be reviewed alone.
+      cargo-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions used by the workflows in .github/workflows.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # The vendored Lichess API spec (reference/lichess-api). A PR here is a heads-up
+  # that the upstream OpenAPI source-of-truth has moved.
+  - package-ecosystem: gitsubmodule
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
