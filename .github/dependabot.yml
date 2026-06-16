@@ -31,6 +31,13 @@ updates:
       interval: weekly
     commit-message:
       prefix: chore
+    ignore:
+      # dtolnay/rust-toolchain's tag is the Rust *channel* (i.e. our MSRV), not
+      # an action version. Left alone, Dependabot "bumps" @1.95.0 -> @1.100.0,
+      # which rewrites the MSRV and fails CI (rustup can't install a nonexistent
+      # toolchain). The MSRV is managed deliberately via rust-toolchain.toml and
+      # Cargo.toml's rust-version, so this action is excluded from updates.
+      - dependency-name: "dtolnay/rust-toolchain"
     groups:
       github-actions:
         patterns:
