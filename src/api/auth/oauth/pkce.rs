@@ -5,7 +5,7 @@ use std::fmt;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use rand::Rng;
-use rand::distributions::Alphanumeric;
+use rand::distr::Alphanumeric;
 use sha2::{Digest, Sha256};
 
 use crate::error::PkceError;
@@ -78,7 +78,7 @@ fn is_unreserved(byte: u8) -> bool {
 ///
 /// Shared by verifier generation and the OAuth `state` value.
 pub(crate) fn random_alphanumeric(len: usize) -> String {
-    rand::thread_rng()
+    rand::rng()
         .sample_iter(Alphanumeric)
         .take(len)
         .map(char::from)
