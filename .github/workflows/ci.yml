@@ -12,6 +12,14 @@ jobs:
   test:
     name: Test, lint, and docs (stable)
     runs-on: ubuntu-latest
+    # rust-toolchain.toml pins 1.95.0 as a directory override, which would
+    # otherwise win over the stable toolchain installed below — making this job
+    # silently run on the MSRV instead of stable. RUSTUP_TOOLCHAIN outranks the
+    # toml file, so this is what actually gives us current-stable coverage.
+    # (The msrv job has no toml override issue: it runs `cargo check` and the
+    # toml's 1.95.0 matches the toolchain it installs.)
+    env:
+      RUSTUP_TOOLCHAIN: stable
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
