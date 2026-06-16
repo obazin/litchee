@@ -1,0 +1,36 @@
+name: CodeQL
+
+# Static analysis of the Rust source. CodeQL's Rust support is newer than its
+# C/Java/JS analyses, so treat findings as advisory. This complements the
+# dependency-advisory scanning that ci.yml already does via cargo audit:
+# CodeQL inspects our own code, cargo audit inspects the supply chain.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * 1" # Mondays 07:00 UTC
+
+jobs:
+  analyze:
+    name: Analyze (Rust)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: rust
+          # Rust uses the no-build extractor; no autobuild/manual build needed.
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:rust"
