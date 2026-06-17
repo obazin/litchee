@@ -56,6 +56,12 @@ jobs:
   audit:
     name: Security advisories (cargo audit)
     runs-on: ubuntu-latest
+    # rustsec/audit-check@v2 still declares the Node.js 20 runtime, which is
+    # being removed from runners on 2026-09-16. The node24 fix exists only on
+    # the action's unreleased default branch, so opt the job into the Node.js 24
+    # runtime via GitHub's documented override until a tagged release ships it.
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v6
       - name: Audit dependencies for RustSec advisories
