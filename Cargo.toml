@@ -42,7 +42,7 @@ bytes = "1.11.1"
 futures-core = "0.3.32"
 futures-util = "0.3.32"
 percent-encoding = "2.3"
-rand = "0.9"
+rand = "0.10"
 reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "json", "form", "query", "stream", "http2"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"

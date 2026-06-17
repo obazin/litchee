@@ -4,7 +4,7 @@ use std::fmt;
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use rand::Rng;
+use rand::RngExt;
 use rand::distr::Alphanumeric;
 use sha2::{Digest, Sha256};
 
