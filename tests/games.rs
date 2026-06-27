@@ -107,7 +107,7 @@ async fn import_game_posts_pgn() {
 #[tokio::test]
 async fn now_playing_returns_games() {
     let server = MockServer::start().await;
-    let body = r#"{"nowPlaying":[{"gameId":"g","fullId":"gf","color":"white","fen":"x",
+    let body = r#"{"nbMyTurn":1,"nowPlaying":[{"gameId":"g","fullId":"gf","color":"white","fen":"x",
         "opponent":{"id":"o","username":"O","rating":1500}}]}"#;
     Mock::given(method("GET"))
         .and(path("/api/account/playing"))
@@ -115,6 +115,7 @@ async fn now_playing_returns_games() {
         .mount(&server)
         .await;
     let playing = client(&server).games().now_playing().await.unwrap();
+    assert_eq!(playing.nb_my_turn, 1);
     assert_eq!(playing.now_playing[0].game_id, "g");
     assert_eq!(playing.now_playing[0].opponent.username, "O");
 }

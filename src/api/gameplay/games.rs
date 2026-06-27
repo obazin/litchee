@@ -760,6 +760,8 @@ pub struct LichessNowPlayingGame {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct LichessNowPlaying {
+    /// Number of games where it is the user's turn to play.
+    pub nb_my_turn: u32,
     /// The ongoing games.
     #[serde(default)]
     pub now_playing: Vec<LichessNowPlayingGame>,
