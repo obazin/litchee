@@ -265,6 +265,24 @@ async fn stream_round_pgn_returns_text() {
 }
 
 #[tokio::test]
+async fn stream_group_pgn_returns_text() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/stream/broadcast/group/albQx5zq.pgn"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"Group\"]\n\n1. c4 *"))
+        .mount(&server)
+        .await;
+
+    let pgn = client(&server)
+        .broadcasts()
+        .stream_group_pgn("albQx5zq")
+        .await
+        .unwrap();
+
+    assert!(pgn.contains("Group"));
+}
+
+#[tokio::test]
 async fn player_returns_a_single_entry() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
