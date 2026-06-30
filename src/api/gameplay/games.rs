@@ -76,9 +76,9 @@ impl<'a> GamesApi<'a> {
         http::json(request, "LichessNowPlaying").await
     }
 
-    /// Gets the spectator chat of a game. `GET /game/{gameId}/chat`
+    /// Gets the spectator chat of a game. `GET /api/game/{gameId}/chat`
     pub async fn chat(&self, game_id: &str) -> Result<Vec<LichessGameChatMessage>> {
-        let path = format!("/game/{}/chat", http::segment(game_id));
+        let path = format!("/api/game/{}/chat", http::segment(game_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "Vec<LichessGameChatMessage>").await
     }

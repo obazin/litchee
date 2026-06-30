@@ -124,7 +124,7 @@ async fn now_playing_returns_games() {
 async fn chat_returns_messages() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
-        .and(path("/game/g/chat"))
+        .and(path("/api/game/g/chat"))
         .respond_with(
             ResponseTemplate::new(200).set_body_string(r#"[{"user":"Toby","text":"hi"}]"#),
         )
