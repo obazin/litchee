@@ -76,9 +76,9 @@ impl<'a> GamesApi<'a> {
         http::json(request, "LichessNowPlaying").await
     }
 
-    /// Gets the spectator chat of a game. `GET /game/{gameId}/chat`
+    /// Gets the spectator chat of a game. `GET /api/game/{gameId}/chat`
     pub async fn chat(&self, game_id: &str) -> Result<Vec<LichessGameChatMessage>> {
-        let path = format!("/game/{}/chat", http::segment(game_id));
+        let path = format!("/api/game/{}/chat", http::segment(game_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "Vec<LichessGameChatMessage>").await
     }
@@ -560,6 +560,27 @@ pub struct LichessGameDivision {
     pub end: Option<u32>,
 }
 
+/// The arena tournament a [`LichessGame`] is from.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessGameArenaTour {
+    /// The arena tournament id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// The arena tournament name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+/// The swiss tournament a [`LichessGame`] is from.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessGameSwissTour {
+    /// The swiss tournament id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+}
+
 /// A game, as returned in JSON by the export and stream endpoints.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -615,12 +636,12 @@ pub struct LichessGame {
     /// Per-move analysis, when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub analysis: Option<Vec<LichessGameMoveAnalysis>>,
-    /// The arena tournament id, if any.
+    /// The arena tournament the game is from, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tournament: Option<String>,
-    /// The swiss tournament id, if any.
+    pub arena_tour: Option<LichessGameArenaTour>,
+    /// The swiss tournament the game is from, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub swiss: Option<String>,
+    pub swiss_tour: Option<LichessGameSwissTour>,
     /// The clock configuration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clock: Option<LichessGameClock>,
@@ -681,6 +702,17 @@ mod tests {
         let game: LichessGame =
             serde_json::from_str(r#"{"id":"x","status":"variantEnd"}"#).unwrap();
         assert_eq!(game.status, Some(LichessGameStatusName::VariantEnd));
+    }
+
+    #[test]
+    fn parses_arena_and_swiss_tour_objects() {
+        let json = r#"{"id":"g","arenaTour":{"id":"abc","name":"Hourly"},
+            "swissTour":{"id":"xyz"}}"#;
+        let game: LichessGame = serde_json::from_str(json).unwrap();
+        let arena = game.arena_tour.unwrap();
+        assert_eq!(arena.id.as_deref(), Some("abc"));
+        assert_eq!(arena.name.as_deref(), Some("Hourly"));
+        assert_eq!(game.swiss_tour.unwrap().id.as_deref(), Some("xyz"));
     }
 }
 
