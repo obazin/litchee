@@ -31,6 +31,36 @@ pub enum LichessSpeed {
     Correspondence,
 }
 
+impl LichessSpeed {
+    /// The wire representation, e.g. `"ultraBullet"` — matches the serde
+    /// `camelCase` encoding. Useful for building query strings.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LichessSpeed::UltraBullet => "ultraBullet",
+            LichessSpeed::Bullet => "bullet",
+            LichessSpeed::Blitz => "blitz",
+            LichessSpeed::Rapid => "rapid",
+            LichessSpeed::Classical => "classical",
+            LichessSpeed::Correspondence => "correspondence",
+        }
+    }
+
+    /// Parses a speed from its wire representation.
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "ultraBullet" => Some(LichessSpeed::UltraBullet),
+            "bullet" => Some(LichessSpeed::Bullet),
+            "blitz" => Some(LichessSpeed::Blitz),
+            "rapid" => Some(LichessSpeed::Rapid),
+            "classical" => Some(LichessSpeed::Classical),
+            "correspondence" => Some(LichessSpeed::Correspondence),
+            _ => None,
+        }
+    }
+}
+
 /// A chess variant key as used throughout the API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

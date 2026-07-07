@@ -11,7 +11,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
-use crate::model::LichessColor;
+use crate::model::{LichessColor, LichessSpeed};
 
 /// Query parameters shared by the masters and Lichess explorers.
 #[derive(Debug, Serialize)]
@@ -19,6 +19,147 @@ struct ExplorerQuery<'a> {
     fen: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     play: Option<&'a str>,
+}
+
+/// A player-rating band the Lichess games explorer can be filtered to. Each
+/// value is the inclusive lower bound of a 200-point band (`R0` = below 1000,
+/// `R2500` = 2500 and above).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RatingGroup {
+    /// Below 1000.
+    R0,
+    /// 1000–1199.
+    R1000,
+    /// 1200–1399.
+    R1200,
+    /// 1400–1599.
+    R1400,
+    /// 1600–1799.
+    R1600,
+    /// 1800–1999.
+    R1800,
+    /// 2000–2199.
+    R2000,
+    /// 2200–2499.
+    R2200,
+    /// 2500 and above.
+    R2500,
+}
+
+impl RatingGroup {
+    /// Every rating band, in ascending order — the full set the API accepts.
+    pub const ALL: [RatingGroup; 9] = [
+        RatingGroup::R0,
+        RatingGroup::R1000,
+        RatingGroup::R1200,
+        RatingGroup::R1400,
+        RatingGroup::R1600,
+        RatingGroup::R1800,
+        RatingGroup::R2000,
+        RatingGroup::R2200,
+        RatingGroup::R2500,
+    ];
+
+    /// The wire value (the band's lower bound), e.g. `1600`.
+    #[must_use]
+    pub fn as_u16(self) -> u16 {
+        match self {
+            RatingGroup::R0 => 0,
+            RatingGroup::R1000 => 1000,
+            RatingGroup::R1200 => 1200,
+            RatingGroup::R1400 => 1400,
+            RatingGroup::R1600 => 1600,
+            RatingGroup::R1800 => 1800,
+            RatingGroup::R2000 => 2000,
+            RatingGroup::R2200 => 2200,
+            RatingGroup::R2500 => 2500,
+        }
+    }
+
+    /// Parses a band from its wire value, or `None` if it isn't a valid bucket.
+    #[must_use]
+    pub fn from_u16(value: u16) -> Option<Self> {
+        Self::ALL.into_iter().find(|group| group.as_u16() == value)
+    }
+}
+
+/// Filter parameters for the Lichess games explorer ([`OpeningExplorerApi::lichess`]).
+///
+/// All fields are optional; [`Default`] is the unfiltered query (every speed and
+/// rating band). An empty `speeds`/`ratings` slice means "no restriction".
+#[derive(Debug, Clone, Default)]
+pub struct LichessExplorerParams<'a> {
+    /// Comma-separated UCI moves to apply to `fen` before the lookup.
+    pub play: Option<&'a str>,
+    /// Chess variant (defaults to standard when unset).
+    pub variant: Option<&'a str>,
+    /// Restrict to these game speeds (empty = all).
+    pub speeds: &'a [LichessSpeed],
+    /// Restrict to these rating bands (empty = all).
+    pub ratings: &'a [RatingGroup],
+    /// Only games from this `YYYY-MM` or later.
+    pub since: Option<&'a str>,
+    /// Only games from this `YYYY-MM` or earlier.
+    pub until: Option<&'a str>,
+    /// Number of most-common moves to return.
+    pub moves: Option<u32>,
+    /// Number of top games to return.
+    pub top_games: Option<u32>,
+    /// Number of recent games to return.
+    pub recent_games: Option<u32>,
+    /// Whether to include the month-by-month history.
+    pub history: Option<bool>,
+}
+
+/// Builds the `/lichess` query string from `fen` + `params`. Empty / unset
+/// fields are omitted. Extracted from [`OpeningExplorerApi::lichess`] so it can
+/// be unit-tested without a client.
+fn build_lichess_query(fen: &str, params: &LichessExplorerParams<'_>) -> Vec<(&'static str, String)> {
+    let mut query: Vec<(&'static str, String)> = vec![("fen", fen.to_owned())];
+    if let Some(play) = params.play {
+        query.push(("play", play.to_owned()));
+    }
+    if let Some(variant) = params.variant {
+        query.push(("variant", variant.to_owned()));
+    }
+    if !params.speeds.is_empty() {
+        let speeds = params
+            .speeds
+            .iter()
+            .map(|speed| speed.as_str())
+            .collect::<Vec<_>>()
+            .join(",");
+        query.push(("speeds", speeds));
+    }
+    if !params.ratings.is_empty() {
+        let ratings = params
+            .ratings
+            .iter()
+            .map(|rating| rating.as_u16().to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        query.push(("ratings", ratings));
+    }
+    if let Some(since) = params.since {
+        query.push(("since", since.to_owned()));
+    }
+    if let Some(until) = params.until {
+        query.push(("until", until.to_owned()));
+    }
+    if let Some(moves) = params.moves {
+        query.push(("moves", moves.to_string()));
+    }
+    if let Some(top_games) = params.top_games {
+        query.push(("topGames", top_games.to_string()));
+    }
+    if let Some(recent_games) = params.recent_games {
+        query.push(("recentGames", recent_games.to_string()));
+    }
+    if let Some(history) = params.history {
+        query.push(("history", history.to_string()));
+    }
+    query
 }
 
 /// Query parameters for the player explorer.
@@ -52,8 +193,20 @@ impl<'a> OpeningExplorerApi<'a> {
     }
 
     /// Looks up a position in the Lichess games database. `GET /lichess`
-    pub async fn lichess(&self, fen: &str, play: Option<&str>) -> Result<LichessExplorerResult> {
-        self.lookup("/lichess", fen, play).await
+    ///
+    /// `params` filters the query by speed, rating band, date range, etc.;
+    /// [`LichessExplorerParams::default`] is the unfiltered lookup.
+    pub async fn lichess(
+        &self,
+        fen: &str,
+        params: &LichessExplorerParams<'_>,
+    ) -> Result<LichessExplorerResult> {
+        let query = build_lichess_query(fen, params);
+        let request = self
+            .client
+            .request(Method::GET, Host::OpeningExplorer, "/lichess")
+            .query(&query);
+        http::json(request, "LichessExplorerResult").await
     }
 
     /// Streams a player's opening statistics for a position (NDJSON).
@@ -223,5 +376,42 @@ mod tests {
         assert_eq!(result.white, 100);
         assert_eq!(result.moves[0].average_rating, Some(2400));
         assert_eq!(result.top_games[0].winner, Some(LichessColor::White));
+    }
+
+    #[test]
+    fn default_params_query_is_fen_only() {
+        let query = build_lichess_query("thefen", &LichessExplorerParams::default());
+        assert_eq!(query, vec![("fen", "thefen".to_owned())]);
+    }
+
+    #[test]
+    fn speeds_and_ratings_are_comma_joined() {
+        let params = LichessExplorerParams {
+            speeds: &[LichessSpeed::Blitz, LichessSpeed::Rapid],
+            ratings: &[RatingGroup::R1600, RatingGroup::R1800],
+            ..Default::default()
+        };
+        let query = build_lichess_query("f", &params);
+        assert!(query.contains(&("speeds", "blitz,rapid".to_owned())));
+        assert!(query.contains(&("ratings", "1600,1800".to_owned())));
+    }
+
+    #[test]
+    fn empty_speeds_and_ratings_are_omitted() {
+        let params = LichessExplorerParams {
+            play: Some("e2e4"),
+            ..Default::default()
+        };
+        let query = build_lichess_query("f", &params);
+        assert!(query.iter().all(|(k, _)| *k != "speeds" && *k != "ratings"));
+        assert!(query.contains(&("play", "e2e4".to_owned())));
+    }
+
+    #[test]
+    fn rating_group_round_trips() {
+        for group in RatingGroup::ALL {
+            assert_eq!(RatingGroup::from_u16(group.as_u16()), Some(group));
+        }
+        assert_eq!(RatingGroup::from_u16(1234), None);
     }
 }

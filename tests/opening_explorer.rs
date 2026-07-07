@@ -1,6 +1,7 @@
 //! Integration tests for the Opening Explorer API (explorer host routing).
 
 use futures_util::StreamExt;
+use litchee::api::database::opening_explorer::LichessExplorerParams;
 use litchee::LichessClient;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -49,7 +50,43 @@ async fn lichess_sends_play_moves() {
 
     let result = client(&server)
         .opening_explorer()
-        .lichess("startpos", Some("e2e4,e7e5"))
+        .lichess(
+            "startpos",
+            &LichessExplorerParams {
+                play: Some("e2e4,e7e5"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.black, 60);
+}
+
+#[tokio::test]
+async fn lichess_sends_speeds_and_ratings() {
+    use litchee::api::database::opening_explorer::RatingGroup;
+    use litchee::model::LichessSpeed;
+
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/lichess"))
+        .and(query_param("speeds", "blitz,rapid"))
+        .and(query_param("ratings", "1600,1800"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(RESULT))
+        .mount(&server)
+        .await;
+
+    let result = client(&server)
+        .opening_explorer()
+        .lichess(
+            "startpos",
+            &LichessExplorerParams {
+                speeds: &[LichessSpeed::Blitz, LichessSpeed::Rapid],
+                ratings: &[RatingGroup::R1600, RatingGroup::R1800],
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
 
