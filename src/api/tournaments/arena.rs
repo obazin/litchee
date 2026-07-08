@@ -11,7 +11,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
-use crate::model::{LichessLightUser, LichessTitle, LichessVariantKey};
+use crate::model::{GameExportOptions, LichessLightUser, LichessTitle, LichessVariantKey};
 
 /// Form body for creating an arena tournament.
 #[derive(Debug, Serialize)]
@@ -172,14 +172,70 @@ impl<'a> ArenaApi<'a> {
         http::stream(request, self.client.max_line_bytes()).await
     }
 
-    /// Streams a tournament's games as NDJSON. `GET /api/tournament/{id}/games`
-    pub async fn games(&self, id: &str) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/tournament/{}/games", http::segment(id));
-        let request = self
-            .client
-            .request(Method::GET, Host::Default, &path)
-            .header(reqwest::header::ACCEPT, "application/x-ndjson");
+    /// Starts an export of a tournament's games. `GET /api/tournament/{id}/games`
+    ///
+    /// Finish with [`stream`](ArenaGamesRequest::stream) or
+    /// [`pgn`](ArenaGamesRequest::pgn).
+    #[must_use]
+    pub fn games(&self, id: &'a str) -> ArenaGamesRequest<'a> {
+        ArenaGamesRequest::new(self.client, id)
+    }
+}
+
+/// Builder for exporting an arena tournament's games
+/// (`GET /api/tournament/{id}/games`).
+#[derive(Debug)]
+pub struct ArenaGamesRequest<'a> {
+    client: &'a LichessClient,
+    id: &'a str,
+    player: Option<&'a str>,
+    export: GameExportOptions,
+}
+
+impl<'a> ArenaGamesRequest<'a> {
+    /// Creates the request builder.
+    pub(crate) fn new(client: &'a LichessClient, id: &'a str) -> Self {
+        Self {
+            client,
+            id,
+            player: None,
+            export: GameExportOptions::default(),
+        }
+    }
+
+    /// Only games featuring this player.
+    #[must_use]
+    pub fn player(mut self, player: &'a str) -> Self {
+        self.player = Some(player);
+        self
+    }
+
+    /// Sets the shared export-format options (moves, clocks, evals, …).
+    #[must_use]
+    pub fn export(mut self, options: GameExportOptions) -> Self {
+        self.export = options;
+        self
+    }
+
+    /// Executes the export, streaming games as decoded JSON values.
+    pub async fn stream(self) -> Result<BoxStream<'static, Result<LichessGame>>> {
+        let request = self.request(http::ACCEPT_NDJSON);
         http::stream(request, self.client.max_line_bytes()).await
+    }
+
+    /// Executes the export, returning all games as one PGN string.
+    pub async fn pgn(self) -> Result<String> {
+        http::text(self.request(http::ACCEPT_PGN)).await
+    }
+
+    /// Builds the request with the given `Accept` representation.
+    fn request(&self, accept: &'static str) -> http::ApiRequest {
+        let path = format!("/api/tournament/{}/games", http::segment(self.id));
+        self.client
+            .request(Method::GET, Host::Default, &path)
+            .header(reqwest::header::ACCEPT, accept)
+            .query(&[("player", self.player)])
+            .query(&self.export)
     }
 }
 
