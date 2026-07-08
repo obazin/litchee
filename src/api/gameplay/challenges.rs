@@ -56,10 +56,16 @@ impl<'a> ChallengesApi<'a> {
     }
 
     /// Accepts an incoming challenge.
+    ///
+    /// `color` picks a side, valid only for open challenges.
     /// `POST /api/challenge/{challengeId}/accept`
-    pub async fn accept(&self, challenge_id: &str) -> Result<()> {
+    pub async fn accept(&self, challenge_id: &str, color: Option<&str>) -> Result<()> {
         let path = format!("/api/challenge/{}/accept", http::segment(challenge_id));
-        http::ok(self.client.request(Method::POST, Host::Default, &path)).await
+        let request = self
+            .client
+            .request(Method::POST, Host::Default, &path)
+            .query(&[("color", color)]);
+        http::ok(request).await
     }
 
     /// Declines an incoming challenge, optionally with a reason key.
@@ -74,10 +80,17 @@ impl<'a> ChallengesApi<'a> {
     }
 
     /// Cancels a challenge you sent.
+    ///
+    /// `opponent_token` (the opponent's `challenge:write` token) lets the game
+    /// be canceled even after both players moved.
     /// `POST /api/challenge/{challengeId}/cancel`
-    pub async fn cancel(&self, challenge_id: &str) -> Result<()> {
+    pub async fn cancel(&self, challenge_id: &str, opponent_token: Option<&str>) -> Result<()> {
         let path = format!("/api/challenge/{}/cancel", http::segment(challenge_id));
-        http::ok(self.client.request(Method::POST, Host::Default, &path)).await
+        let request = self
+            .client
+            .request(Method::POST, Host::Default, &path)
+            .query(&[("opponentToken", opponent_token)]);
+        http::ok(request).await
     }
 
     /// Adds time to the opponent's clock in an ongoing game.
@@ -148,6 +161,10 @@ struct ChallengeForm<'a> {
     variant: Option<LichessVariantKey>,
     #[serde(skip_serializing_if = "Option::is_none")]
     fen: Option<&'a str>,
+    #[serde(rename = "keepAliveStream", skip_serializing_if = "Option::is_none")]
+    keep_alive_stream: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rules: Option<&'a str>,
 }
 
 /// Builder for challenging a specific user.
@@ -208,6 +225,21 @@ impl<'a> ChallengeRequest<'a> {
     #[must_use]
     pub fn fen(mut self, fen: &'a str) -> Self {
         self.form.fen = Some(fen);
+        self
+    }
+
+    /// Keeps the response stream open, emitting status updates until the
+    /// challenge is accepted, declined, or canceled.
+    #[must_use]
+    pub fn keep_alive_stream(mut self, value: bool) -> Self {
+        self.form.keep_alive_stream = Some(value);
+        self
+    }
+
+    /// Sets extra game rules (comma-separated, e.g. `noRematch,noGiveTime`).
+    #[must_use]
+    pub fn rules(mut self, rules: &'a str) -> Self {
+        self.form.rules = Some(rules);
         self
     }
 
@@ -325,6 +357,14 @@ struct OpenForm<'a> {
     variant: Option<LichessVariantKey>,
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fen: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rules: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    users: Option<&'a str>,
+    #[serde(rename = "expiresAt", skip_serializing_if = "Option::is_none")]
+    expires_at: Option<i64>,
 }
 
 /// Builder for an open challenge that anyone can accept.
@@ -376,6 +416,35 @@ impl<'a> OpenChallengeRequest<'a> {
     #[must_use]
     pub fn name(mut self, name: &'a str) -> Self {
         self.form.name = Some(name);
+        self
+    }
+
+    /// Sets a custom starting position (FEN).
+    #[must_use]
+    pub fn fen(mut self, fen: &'a str) -> Self {
+        self.form.fen = Some(fen);
+        self
+    }
+
+    /// Sets extra game rules (comma-separated, e.g. `noRematch,noGiveTime`).
+    #[must_use]
+    pub fn rules(mut self, rules: &'a str) -> Self {
+        self.form.rules = Some(rules);
+        self
+    }
+
+    /// Restricts who may play to these two usernames (comma-separated); the
+    /// game is then created between them.
+    #[must_use]
+    pub fn users(mut self, users: &'a str) -> Self {
+        self.form.users = Some(users);
+        self
+    }
+
+    /// Sets when the challenge expires (Unix milliseconds).
+    #[must_use]
+    pub fn expires_at(mut self, timestamp: i64) -> Self {
+        self.form.expires_at = Some(timestamp);
         self
     }
 
