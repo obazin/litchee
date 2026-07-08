@@ -113,10 +113,11 @@ async fn now_playing_returns_games() {
         "opponent":{"id":"o","username":"O","rating":1500}}]}"#;
     Mock::given(method("GET"))
         .and(path("/api/account/playing"))
+        .and(query_param("nb", "10"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
-    let playing = client(&server).games().now_playing().await.unwrap();
+    let playing = client(&server).games().now_playing(Some(10)).await.unwrap();
     assert_eq!(playing.nb_my_turn, 1);
     assert_eq!(playing.now_playing[0].game_id, "g");
     assert_eq!(playing.now_playing[0].opponent.username, "O");
@@ -251,6 +252,7 @@ async fn stream_by_users_streams_games() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/api/stream/games-by-users"))
+        .and(query_param("withCurrentGames", "true"))
         .and(body_string_contains("alice,bob"))
         .respond_with(
             ResponseTemplate::new(200).set_body_string("{\"id\":\"u1\"}\n{\"id\":\"u2\"}\n"),
@@ -259,7 +261,7 @@ async fn stream_by_users_streams_games() {
         .await;
     let stream = client(&server)
         .games()
-        .stream_by_users(&["alice", "bob"])
+        .stream_by_users(&["alice", "bob"], Some(true))
         .await
         .unwrap();
     let games: Vec<_> = stream.collect().await;

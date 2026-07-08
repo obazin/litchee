@@ -24,25 +24,34 @@ impl<'a> TablebaseApi<'a> {
     }
 
     /// Looks up a standard-chess position. `GET /standard`
-    pub async fn standard(&self, fen: &str) -> Result<LichessTablebasePosition> {
-        self.lookup("/standard", fen).await
+    ///
+    /// `dtc` controls distance-to-conversion output (`never`, `auxiliary`, or
+    /// `always`).
+    pub async fn standard(&self, fen: &str, dtc: Option<&str>) -> Result<LichessTablebasePosition> {
+        self.lookup("/standard", fen, dtc).await
     }
 
     /// Looks up an atomic-chess position. `GET /atomic`
     pub async fn atomic(&self, fen: &str) -> Result<LichessTablebasePosition> {
-        self.lookup("/atomic", fen).await
+        self.lookup("/atomic", fen, None).await
     }
 
     /// Looks up an antichess position. `GET /antichess`
     pub async fn antichess(&self, fen: &str) -> Result<LichessTablebasePosition> {
-        self.lookup("/antichess", fen).await
+        self.lookup("/antichess", fen, None).await
     }
 
     /// Issues a tablebase lookup against the tablebase host.
-    async fn lookup(&self, path: &str, fen: &str) -> Result<LichessTablebasePosition> {
+    async fn lookup(
+        &self,
+        path: &str,
+        fen: &str,
+        dtc: Option<&str>,
+    ) -> Result<LichessTablebasePosition> {
         let request = self
             .client
             .request(Method::GET, Host::Tablebase, path)
+            .query(&[("dtc", dtc)])
             .query(&[("fen", fen)]);
         http::json(request, "LichessTablebasePosition").await
     }

@@ -213,12 +213,18 @@ impl<'a> SwissApi<'a> {
     }
 
     /// Streams a swiss tournament's results. `GET /api/swiss/{id}/results`
+    ///
+    /// `nb` limits the number of results.
     pub async fn results(
         &self,
         id: &str,
+        nb: Option<u32>,
     ) -> Result<BoxStream<'static, Result<LichessSwissResult>>> {
         let path = format!("/api/swiss/{}/results", http::segment(id));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("nb", nb)]);
         http::stream(request, self.client.max_line_bytes()).await
     }
 

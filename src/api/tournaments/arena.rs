@@ -156,9 +156,14 @@ impl<'a> ArenaApi<'a> {
     }
 
     /// Gets full details of a tournament. `GET /api/tournament/{id}`
-    pub async fn get(&self, id: &str) -> Result<LichessArenaFull> {
+    ///
+    /// `page` selects a page of the standings (defaults to the first).
+    pub async fn get(&self, id: &str, page: Option<u32>) -> Result<LichessArenaFull> {
         let path = format!("/api/tournament/{}", http::segment(id));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("page", page)]);
         http::json(request, "LichessArenaFull").await
     }
 
@@ -229,23 +234,41 @@ impl<'a> ArenaApi<'a> {
 
     /// Streams the arenas created by a user (NDJSON).
     /// `GET /api/user/{username}/tournament/created`
+    ///
+    /// `nb` limits the count; `status` filters by one or more tournament status
+    /// codes (repeatable — pass several to combine them).
     pub async fn created_by(
         &self,
         username: &str,
+        nb: Option<u32>,
+        status: &[u32],
     ) -> Result<BoxStream<'static, Result<LichessArena>>> {
         let path = format!("/api/user/{}/tournament/created", http::segment(username));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let status: Vec<(&str, u32)> = status.iter().map(|code| ("status", *code)).collect();
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("nb", nb)])
+            .query(&status);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams the arenas a user has played (NDJSON).
     /// `GET /api/user/{username}/tournament/played`
+    ///
+    /// `nb` limits the count; `performance` includes performance ratings.
     pub async fn played_by(
         &self,
         username: &str,
+        nb: Option<u32>,
+        performance: Option<bool>,
     ) -> Result<BoxStream<'static, Result<LichessArena>>> {
         let path = format!("/api/user/{}/tournament/played", http::segment(username));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("nb", nb)])
+            .query(&[("performance", performance)]);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
@@ -268,12 +291,20 @@ impl<'a> ArenaApi<'a> {
     }
 
     /// Streams a tournament's results. `GET /api/tournament/{id}/results`
+    ///
+    /// `nb` limits the count; `sheet` includes each player's score sheet.
     pub async fn results(
         &self,
         id: &str,
+        nb: Option<u32>,
+        sheet: Option<bool>,
     ) -> Result<BoxStream<'static, Result<LichessArenaResult>>> {
         let path = format!("/api/tournament/{}/results", http::segment(id));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("nb", nb)])
+            .query(&[("sheet", sheet)]);
         http::stream(request, self.client.max_line_bytes()).await
     }
 

@@ -33,14 +33,18 @@ impl GamesApi<'_> {
     }
 
     /// Streams games played by the given users as they start/finish (NDJSON).
+    ///
+    /// `with_current_games` also includes each user's ongoing game at connect.
     /// `POST /api/stream/games-by-users`
     pub async fn stream_by_users(
         &self,
         usernames: &[&str],
+        with_current_games: Option<bool>,
     ) -> Result<BoxStream<'static, Result<LichessGame>>> {
         let request = self
             .client
             .request(Method::POST, Host::Default, "/api/stream/games-by-users")
+            .query(&[("withCurrentGames", with_current_games)])
             .header(CONTENT_TYPE, "text/plain")
             .body(usernames.join(","));
         http::stream(request, self.client.max_line_bytes()).await
