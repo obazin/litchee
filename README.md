@@ -187,7 +187,7 @@ use litchee::LichessClient;
 let client = LichessClient::new();
 
 // Browse official broadcasts, then export a round's games as PGN.
-let mut official = client.broadcasts().official().await?;
+let mut official = client.broadcasts().official(None, None, None).await?;
 if let Some(broadcast) = official.next().await {
     let broadcast = broadcast?;
     println!("Broadcast: {}", broadcast.tour.name);
