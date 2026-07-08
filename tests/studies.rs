@@ -133,6 +133,7 @@ async fn import_pgn_posts_name_and_pgn() {
         .and(path("/api/study/WTvnkWAL/import-pgn"))
         .and(body_string_contains("name=Game"))
         .and(body_string_contains("pgn="))
+        .and(body_string_contains("mode=each"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
@@ -141,6 +142,7 @@ async fn import_pgn_posts_name_and_pgn() {
         .studies()
         .import_pgn("WTvnkWAL", "Game 1", "1. e4 e5 *")
         .orientation("white")
+        .mode("each")
         .send()
         .await
         .unwrap();
@@ -170,6 +172,8 @@ async fn create_study_returns_id() {
     Mock::given(method("POST"))
         .and(path("/api/study"))
         .and(body_string_contains("name=My+Study"))
+        .and(body_string_contains("cloneable=nobody"))
+        .and(body_string_contains("sticky=false"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"abc12345"}"#))
         .mount(&server)
         .await;
@@ -177,6 +181,8 @@ async fn create_study_returns_id() {
         .studies()
         .create_study("My Study")
         .visibility("private")
+        .cloneable("nobody")
+        .sticky("false")
         .send()
         .await
         .unwrap();

@@ -21,6 +21,8 @@ struct ImportForm<'a> {
     orientation: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     variant: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<&'a str>,
 }
 
 /// Accessor for the Studies API.
@@ -179,7 +181,7 @@ struct StudyCreated {
 }
 
 /// Form body for creating a study.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 struct CreateStudyForm<'a> {
     name: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -188,6 +190,14 @@ struct CreateStudyForm<'a> {
     computer: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     explorer: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cloneable: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    shareable: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    chat: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sticky: Option<&'a str>,
 }
 
 /// Builder for creating a study.
@@ -204,9 +214,7 @@ impl<'a> CreateStudyRequest<'a> {
             client,
             form: CreateStudyForm {
                 name,
-                visibility: None,
-                computer: None,
-                explorer: None,
+                ..Default::default()
             },
         }
     }
@@ -229,6 +237,34 @@ impl<'a> CreateStudyRequest<'a> {
     #[must_use]
     pub fn explorer(mut self, explorer: &'a str) -> Self {
         self.form.explorer = Some(explorer);
+        self
+    }
+
+    /// Sets who may clone the study.
+    #[must_use]
+    pub fn cloneable(mut self, cloneable: &'a str) -> Self {
+        self.form.cloneable = Some(cloneable);
+        self
+    }
+
+    /// Sets who may share/export the study.
+    #[must_use]
+    pub fn shareable(mut self, shareable: &'a str) -> Self {
+        self.form.shareable = Some(shareable);
+        self
+    }
+
+    /// Sets who may use the chat.
+    #[must_use]
+    pub fn chat(mut self, chat: &'a str) -> Self {
+        self.form.chat = Some(chat);
+        self
+    }
+
+    /// Sets whether everyone stays on the same chapter/position (`true`/`false`).
+    #[must_use]
+    pub fn sticky(mut self, sticky: &'a str) -> Self {
+        self.form.sticky = Some(sticky);
         self
     }
 
@@ -262,6 +298,7 @@ impl<'a> ImportPgnRequest<'a> {
                 pgn,
                 orientation: None,
                 variant: None,
+                mode: None,
             },
         }
     }
@@ -277,6 +314,13 @@ impl<'a> ImportPgnRequest<'a> {
     #[must_use]
     pub fn variant(mut self, variant: &'a str) -> Self {
         self.form.variant = Some(variant);
+        self
+    }
+
+    /// Sets how chapters are added (`orientation`, or `each` for one per game).
+    #[must_use]
+    pub fn mode(mut self, mode: &'a str) -> Self {
+        self.form.mode = Some(mode);
         self
     }
 
