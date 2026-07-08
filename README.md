@@ -167,7 +167,10 @@ let client = LichessClient::builder().token("lip_your_token").build()?;
 let mut studies = client.studies().list_metadata("bobby").await?;
 if let Some(study) = studies.next().await {
     let study = study?;
-    let pgn = client.studies().export_study_pgn(&study.id).await?;
+    let pgn = client
+        .studies()
+        .export_study_pgn(&study.id, &Default::default())
+        .await?;
     println!("{} — {} bytes of PGN", study.name, pgn.len());
 }
 # Ok(())
@@ -189,7 +192,10 @@ if let Some(broadcast) = official.next().await {
     let broadcast = broadcast?;
     println!("Broadcast: {}", broadcast.tour.name);
     if let Some(round) = broadcast.rounds.first() {
-        let pgn = client.broadcasts().round_pgn(&round.id).await?;
+        let pgn = client
+            .broadcasts()
+            .round_pgn(&round.id, &Default::default())
+            .await?;
         println!("Round '{}' — {} bytes of PGN", round.name, pgn.len());
     }
 }

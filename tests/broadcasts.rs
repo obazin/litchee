@@ -3,6 +3,7 @@
 use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::broadcasting::broadcasts::BroadcastTourInfo;
+use litchee::model::PgnExportOptions;
 use wiremock::matchers::{body_string_contains, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -60,11 +61,20 @@ async fn round_pgn_returns_text() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/api/broadcast/round/r1.pgn"))
+        .and(query_param("clocks", "false"))
+        .and(query_param("comments", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"Round 1\"]\n\n1. e4 *"))
         .mount(&server)
         .await;
 
-    let pgn = client(&server).broadcasts().round_pgn("r1").await.unwrap();
+    let pgn = client(&server)
+        .broadcasts()
+        .round_pgn(
+            "r1",
+            &PgnExportOptions::default().clocks(false).comments(true),
+        )
+        .await
+        .unwrap();
 
     assert!(pgn.contains("Round 1"));
 }
@@ -250,7 +260,7 @@ async fn all_rounds_pgn_returns_text() {
 
     let pgn = client(&server)
         .broadcasts()
-        .all_rounds_pgn("abc")
+        .all_rounds_pgn("abc", &PgnExportOptions::default())
         .await
         .unwrap();
 
@@ -268,7 +278,7 @@ async fn stream_round_pgn_returns_text() {
 
     let pgn = client(&server)
         .broadcasts()
-        .stream_round_pgn("r1")
+        .stream_round_pgn("r1", &PgnExportOptions::default())
         .await
         .unwrap();
 
@@ -286,7 +296,7 @@ async fn stream_group_pgn_returns_text() {
 
     let pgn = client(&server)
         .broadcasts()
-        .stream_group_pgn("albQx5zq")
+        .stream_group_pgn("albQx5zq", &PgnExportOptions::default())
         .await
         .unwrap();
 
