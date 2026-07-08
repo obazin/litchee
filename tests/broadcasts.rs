@@ -2,7 +2,7 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
-use litchee::api::broadcasting::broadcasts::BroadcastTourInfo;
+use litchee::api::broadcasting::broadcasts::{BroadcastGrouping, BroadcastTourInfo};
 use litchee::model::PgnExportOptions;
 use wiremock::matchers::{body_string_contains, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -161,6 +161,36 @@ async fn create_tour_posts_to_new() {
         .await
         .unwrap();
     assert_eq!(tour.tour.id, "t1");
+}
+
+#[tokio::test]
+async fn create_tour_posts_tiebreaks_and_grouping() {
+    let server = MockServer::start().await;
+    let body = r#"{"tour":{"id":"t2","name":"Grouped"},"rounds":[]}"#;
+    Mock::given(method("POST"))
+        .and(path("/broadcast/new"))
+        // Bodies are percent-encoded: %5B0%5D decodes to [0].
+        .and(body_string_contains("tiebreaks%5B0%5D=BH"))
+        .and(body_string_contains("tiebreaks%5B1%5D=AOB"))
+        .and(body_string_contains("grouping.info.name=Olympiad"))
+        .and(body_string_contains("grouping.scoreGroups%5B0%5D=a%2Cb"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+    let tour = client(&server)
+        .broadcasts()
+        .create_tour("Grouped")
+        .tiebreaks(&["BH", "AOB"])
+        .grouping(
+            BroadcastGrouping::default()
+                .name("Olympiad")
+                .tours("a,b")
+                .score_group("a,b"),
+        )
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(tour.tour.id, "t2");
 }
 
 #[tokio::test]

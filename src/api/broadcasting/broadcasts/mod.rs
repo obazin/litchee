@@ -397,6 +397,56 @@ impl<'a> BroadcastTourInfo<'a> {
     }
 }
 
+/// Grouping configuration for a broadcast tournament, serialized as the nested
+/// `grouping.*` form keys (`grouping.info.name`, `grouping.info.tours`, and
+/// `grouping.scoreGroups[i]`).
+#[derive(Debug, Clone, Default)]
+pub struct BroadcastGrouping<'a> {
+    name: Option<&'a str>,
+    tours: Option<&'a str>,
+    score_groups: Vec<&'a str>,
+}
+
+impl<'a> BroadcastGrouping<'a> {
+    /// Sets the group name.
+    #[must_use]
+    pub fn name(mut self, name: &'a str) -> Self {
+        self.name = Some(name);
+        self
+    }
+
+    /// Sets the comma-separated tournament ids to group together.
+    #[must_use]
+    pub fn tours(mut self, tours: &'a str) -> Self {
+        self.tours = Some(tours);
+        self
+    }
+
+    /// Adds a score group (comma-separated tournament ids). Call repeatedly for
+    /// several groups; ids must be a subset of [`tours`](Self::tours).
+    #[must_use]
+    pub fn score_group(mut self, tours: &'a str) -> Self {
+        self.score_groups.push(tours);
+        self
+    }
+
+    /// Appends the `grouping.*` form pairs; adds nothing when unset.
+    fn append_pairs(&self, out: &mut Vec<(String, String)>) {
+        if let Some(name) = self.name {
+            out.push(("grouping.info.name".to_owned(), name.to_owned()));
+        }
+        if let Some(tours) = self.tours {
+            out.push(("grouping.info.tours".to_owned(), tours.to_owned()));
+        }
+        for (index, group) in self.score_groups.iter().enumerate() {
+            out.push((
+                format!("grouping.scoreGroups[{index}]"),
+                (*group).to_owned(),
+            ));
+        }
+    }
+}
+
 /// Builder for creating or editing a broadcast tournament.
 #[derive(Debug)]
 pub struct TourRequest<'a> {
@@ -404,6 +454,8 @@ pub struct TourRequest<'a> {
     edit_id: Option<&'a str>,
     form: TourForm<'a>,
     info: BroadcastTourInfo<'a>,
+    tiebreaks: Vec<&'a str>,
+    grouping: BroadcastGrouping<'a>,
 }
 
 impl<'a> TourRequest<'a> {
@@ -417,6 +469,8 @@ impl<'a> TourRequest<'a> {
                 ..Default::default()
             },
             info: BroadcastTourInfo::default(),
+            tiebreaks: Vec::new(),
+            grouping: BroadcastGrouping::default(),
         }
     }
 
@@ -483,10 +537,20 @@ impl<'a> TourRequest<'a> {
         self
     }
 
-    // NOTE: `tiebreaks` (an array) and `grouping` (a nested object with an
-    // inner array) are intentionally not exposed yet — they need array /
-    // nested form-key encoding that the flat value-type approach does not
-    // cover. Tracked as a follow-up gap.
+    /// Sets the tiebreak ordering (extended tiebreak codes, e.g. `BH`, `AOB`;
+    /// up to 5).
+    #[must_use]
+    pub fn tiebreaks(mut self, tiebreaks: &[&'a str]) -> Self {
+        self.tiebreaks = tiebreaks.to_vec();
+        self
+    }
+
+    /// Sets the grouping configuration (group this broadcast with others).
+    #[must_use]
+    pub fn grouping(mut self, grouping: BroadcastGrouping<'a>) -> Self {
+        self.grouping = grouping;
+        self
+    }
 
     /// Creates or updates the tournament.
     pub async fn send(self) -> Result<LichessBroadcast> {
@@ -494,11 +558,26 @@ impl<'a> TourRequest<'a> {
             Some(id) => format!("/broadcast/{}/edit", http::segment(id)),
             None => "/broadcast/new".to_owned(),
         };
+        let extra_pairs = self.extra_pairs();
+        let core = serde_urlencoded::to_string(&self.form).unwrap_or_default();
+        let info = serde_urlencoded::to_string(&self.info).unwrap_or_default();
+        let extra = serde_urlencoded::to_string(&extra_pairs).unwrap_or_default();
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .form_parts(&self.form, &self.info);
+            .form_body(http::join_form(&[core, info, extra]));
         http::json(request, "LichessBroadcast").await
+    }
+
+    /// Builds the array/nested `tiebreaks[i]` + `grouping.*` form pairs, which
+    /// `serde_urlencoded` cannot express as struct fields.
+    fn extra_pairs(&self) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        for (index, code) in self.tiebreaks.iter().enumerate() {
+            pairs.push((format!("tiebreaks[{index}]"), (*code).to_owned()));
+        }
+        self.grouping.append_pairs(&mut pairs);
+        pairs
     }
 }
 
@@ -722,6 +801,22 @@ mod tests {
         assert_eq!(
             serde_urlencoded::to_string(BroadcastTourInfo::default()).unwrap(),
             ""
+        );
+    }
+
+    #[test]
+    fn grouping_encodes_nested_and_indexed_keys() {
+        let mut pairs = vec![("tiebreaks[0]".to_owned(), "BH".to_owned())];
+        BroadcastGrouping::default()
+            .name("Open")
+            .tours("a,b")
+            .score_group("a,b")
+            .append_pairs(&mut pairs);
+        let encoded = serde_urlencoded::to_string(&pairs).unwrap();
+        assert_eq!(
+            encoded,
+            "tiebreaks%5B0%5D=BH&grouping.info.name=Open\
+             &grouping.info.tours=a%2Cb&grouping.scoreGroups%5B0%5D=a%2Cb"
         );
     }
 }
