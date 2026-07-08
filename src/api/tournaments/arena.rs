@@ -13,8 +13,8 @@ use crate::error::Result;
 use crate::http;
 use crate::model::{GameExportOptions, LichessLightUser, LichessTitle, LichessVariantKey};
 
-/// Form body for creating an arena tournament.
-#[derive(Debug, Serialize)]
+/// Form body for creating an arena tournament (flat, non-`conditions` fields).
+#[derive(Debug, Default, Serialize)]
 struct CreateForm<'a> {
     name: &'a str,
     #[serde(rename = "clockTime")]
@@ -28,6 +28,111 @@ struct CreateForm<'a> {
     variant: Option<LichessVariantKey>,
     #[serde(rename = "waitMinutes", skip_serializing_if = "Option::is_none")]
     wait_minutes: Option<u32>,
+    #[serde(rename = "startDate", skip_serializing_if = "Option::is_none")]
+    start_date: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    position: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    berserkable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    streakable: Option<bool>,
+    #[serde(rename = "hasChat", skip_serializing_if = "Option::is_none")]
+    has_chat: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    password: Option<&'a str>,
+    #[serde(rename = "teamBattleByTeam", skip_serializing_if = "Option::is_none")]
+    team_battle_by_team: Option<&'a str>,
+}
+
+/// Entry conditions for an arena tournament, serialized as `conditions.*` keys.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ArenaConditions<'a> {
+    #[serde(
+        rename = "conditions.minRating.rating",
+        skip_serializing_if = "Option::is_none"
+    )]
+    min_rating: Option<u32>,
+    #[serde(
+        rename = "conditions.maxRating.rating",
+        skip_serializing_if = "Option::is_none"
+    )]
+    max_rating: Option<u32>,
+    #[serde(
+        rename = "conditions.nbRatedGame.nb",
+        skip_serializing_if = "Option::is_none"
+    )]
+    nb_rated_games: Option<u32>,
+    #[serde(
+        rename = "conditions.allowList",
+        skip_serializing_if = "Option::is_none"
+    )]
+    allow_list: Option<&'a str>,
+    #[serde(
+        rename = "conditions.teamMember.teamId",
+        skip_serializing_if = "Option::is_none"
+    )]
+    team_member: Option<&'a str>,
+    #[serde(rename = "conditions.bots", skip_serializing_if = "Option::is_none")]
+    bots: Option<bool>,
+    #[serde(
+        rename = "conditions.accountAge",
+        skip_serializing_if = "Option::is_none"
+    )]
+    account_age: Option<u32>,
+}
+
+impl<'a> ArenaConditions<'a> {
+    /// Minimum rating to join.
+    #[must_use]
+    pub fn min_rating(mut self, rating: u32) -> Self {
+        self.min_rating = Some(rating);
+        self
+    }
+
+    /// Maximum rating to join (best rating over the last 7 days).
+    #[must_use]
+    pub fn max_rating(mut self, rating: u32) -> Self {
+        self.max_rating = Some(rating);
+        self
+    }
+
+    /// Minimum number of rated games required to join.
+    #[must_use]
+    pub fn nb_rated_games(mut self, count: u32) -> Self {
+        self.nb_rated_games = Some(count);
+        self
+    }
+
+    /// Comma-separated usernames allowed to join (append `%titled` to also allow
+    /// any titled player).
+    #[must_use]
+    pub fn allow_list(mut self, usernames: &'a str) -> Self {
+        self.allow_list = Some(usernames);
+        self
+    }
+
+    /// Restrict entry to members of this team.
+    #[must_use]
+    pub fn team_member(mut self, team_id: &'a str) -> Self {
+        self.team_member = Some(team_id);
+        self
+    }
+
+    /// Whether bots may join.
+    #[must_use]
+    pub fn bots(mut self, allowed: bool) -> Self {
+        self.bots = Some(allowed);
+        self
+    }
+
+    /// Minimum account age in days required to join.
+    #[must_use]
+    pub fn account_age(mut self, days: u32) -> Self {
+        self.account_age = Some(days);
+        self
+    }
 }
 
 /// Accessor for the Arena Tournaments API.
@@ -245,6 +350,7 @@ pub struct CreateArenaRequest<'a> {
     client: &'a LichessClient,
     id: Option<&'a str>,
     form: CreateForm<'a>,
+    conditions: ArenaConditions<'a>,
 }
 
 impl<'a> CreateArenaRequest<'a> {
@@ -265,10 +371,9 @@ impl<'a> CreateArenaRequest<'a> {
                 clock_time,
                 clock_increment,
                 minutes,
-                rated: None,
-                variant: None,
-                wait_minutes: None,
+                ..Default::default()
             },
+            conditions: ArenaConditions::default(),
         }
     }
 
@@ -293,6 +398,69 @@ impl<'a> CreateArenaRequest<'a> {
         self
     }
 
+    /// Starts the tournament at this timestamp (ms), overriding `wait_minutes`.
+    #[must_use]
+    pub fn start_date(mut self, timestamp: i64) -> Self {
+        self.form.start_date = Some(timestamp);
+        self
+    }
+
+    /// Sets a custom starting position (FEN).
+    #[must_use]
+    pub fn position(mut self, fen: &'a str) -> Self {
+        self.form.position = Some(fen);
+        self
+    }
+
+    /// Sets whether players may berserk.
+    #[must_use]
+    pub fn berserkable(mut self, value: bool) -> Self {
+        self.form.berserkable = Some(value);
+        self
+    }
+
+    /// Sets whether win streaks grant bonus points.
+    #[must_use]
+    pub fn streakable(mut self, value: bool) -> Self {
+        self.form.streakable = Some(value);
+        self
+    }
+
+    /// Sets whether players can use the chat.
+    #[must_use]
+    pub fn has_chat(mut self, value: bool) -> Self {
+        self.form.has_chat = Some(value);
+        self
+    }
+
+    /// Sets the tournament description.
+    #[must_use]
+    pub fn description(mut self, description: &'a str) -> Self {
+        self.form.description = Some(description);
+        self
+    }
+
+    /// Makes the tournament private, restricted by this password / entry code.
+    #[must_use]
+    pub fn password(mut self, password: &'a str) -> Self {
+        self.form.password = Some(password);
+        self
+    }
+
+    /// Creates a team battle led by this team (creation only).
+    #[must_use]
+    pub fn team_battle_by_team(mut self, team_id: &'a str) -> Self {
+        self.form.team_battle_by_team = Some(team_id);
+        self
+    }
+
+    /// Sets the entry conditions.
+    #[must_use]
+    pub fn conditions(mut self, conditions: ArenaConditions<'a>) -> Self {
+        self.conditions = conditions;
+        self
+    }
+
     /// Creates or updates the tournament.
     pub async fn send(self) -> Result<LichessArenaFull> {
         let path = match self.id {
@@ -302,7 +470,7 @@ impl<'a> CreateArenaRequest<'a> {
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .form(&self.form);
+            .form_parts(&self.form, &self.conditions);
         http::json(request, "LichessArenaFull").await
     }
 }
@@ -531,6 +699,28 @@ mod tests {
             "duels":[{"whatever":true}],"stats":{"games":100}}"#;
         let full: LichessArenaFull = serde_json::from_str(json).unwrap();
         assert_eq!(full.standing.unwrap().players[0].name, "A");
+    }
+
+    #[test]
+    fn conditions_serialize_to_dotted_keys() {
+        let query = serde_urlencoded::to_string(
+            ArenaConditions::default()
+                .min_rating(1600)
+                .allow_list("a,b,%titled")
+                .bots(false),
+        )
+        .unwrap();
+        assert!(query.contains("conditions.minRating.rating=1600"));
+        assert!(query.contains("conditions.allowList=a%2Cb%2C%25titled"));
+        assert!(query.contains("conditions.bots=false"));
+    }
+
+    #[test]
+    fn empty_conditions_serialize_to_nothing() {
+        assert_eq!(
+            serde_urlencoded::to_string(ArenaConditions::default()).unwrap(),
+            ""
+        );
     }
 }
 

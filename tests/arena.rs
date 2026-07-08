@@ -2,6 +2,7 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
+use litchee::api::tournaments::arena::ArenaConditions;
 use litchee::model::GameExportOptions;
 use wiremock::matchers::{
     body_string_contains, header, method, path, query_param, query_param_is_missing,
@@ -53,6 +54,40 @@ async fn create_posts_clock_and_name() {
         .unwrap();
 
     assert_eq!(arena.id, "new1");
+}
+
+#[tokio::test]
+async fn create_posts_conditions_and_extra_fields() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/tournament"))
+        .and(body_string_contains("berserkable=false"))
+        .and(body_string_contains("password=secret"))
+        .and(body_string_contains("teamBattleByTeam=coders"))
+        .and(body_string_contains("conditions.minRating.rating=1600"))
+        .and(body_string_contains("conditions.nbRatedGame.nb=20"))
+        .and(body_string_contains("conditions.bots=false"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"new2"}"#))
+        .mount(&server)
+        .await;
+
+    let arena = client(&server)
+        .arena()
+        .create("Team", 3.0, 0, 60)
+        .berserkable(false)
+        .password("secret")
+        .team_battle_by_team("coders")
+        .conditions(
+            ArenaConditions::default()
+                .min_rating(1600)
+                .nb_rated_games(20)
+                .bots(false),
+        )
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(arena.id, "new2");
 }
 
 #[tokio::test]
