@@ -121,8 +121,15 @@ impl ApiRequest {
     {
         let core = serde_urlencoded::to_string(core).unwrap_or_default();
         let extra = serde_urlencoded::to_string(extra).unwrap_or_default();
-        self.header(CONTENT_TYPE, CONTENT_TYPE_FORM)
-            .body(join_form(&[core, extra]))
+        self.form_body(join_form(&[core, extra]))
+    }
+
+    /// Sets an already-encoded `x-www-form-urlencoded` body and the matching
+    /// content-type. The primitive behind [`form_parts`](Self::form_parts), for
+    /// bodies that combine more than two parts (e.g. flat fields + grouped
+    /// value-types + indexed array keys).
+    pub(crate) fn form_body(self, body: String) -> Self {
+        self.header(CONTENT_TYPE, CONTENT_TYPE_FORM).body(body)
     }
 
     /// Sets a JSON body.
