@@ -144,11 +144,16 @@ async fn results_streams_rows() {
     );
     Mock::given(method("GET"))
         .and(path("/api/swiss/abc/results"))
+        .and(query_param("nb", "50"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
-    let stream = client(&server).swiss().results("abc").await.unwrap();
+    let stream = client(&server)
+        .swiss()
+        .results("abc", Some(50))
+        .await
+        .unwrap();
     let results: Vec<_> = stream.collect().await;
 
     assert_eq!(results.len(), 2);

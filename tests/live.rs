@@ -81,7 +81,7 @@ async fn fide_player() {
 async fn tablebase_standard() {
     let position = LichessClient::new()
         .tablebase()
-        .standard(KQK_FEN)
+        .standard(KQK_FEN, None)
         .await
         .expect("query tablebase");
     assert!(!position.moves.is_empty(), "KQ vs K has legal moves");

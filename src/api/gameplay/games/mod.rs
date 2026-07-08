@@ -95,11 +95,12 @@ impl<'a> GamesApi<'a> {
 
     /// Gets the games the authenticated user is currently playing.
     ///
-    /// `GET /api/account/playing`
-    pub async fn now_playing(&self) -> Result<LichessNowPlaying> {
+    /// `nb` limits the number of games returned. `GET /api/account/playing`
+    pub async fn now_playing(&self, nb: Option<u32>) -> Result<LichessNowPlaying> {
         let request = self
             .client
-            .request(Method::GET, Host::Default, "/api/account/playing");
+            .request(Method::GET, Host::Default, "/api/account/playing")
+            .query(&[("nb", nb)]);
         http::json(request, "LichessNowPlaying").await
     }
 

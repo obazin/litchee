@@ -32,11 +32,12 @@ async fn online_streams_bot_users() {
     let body = "{\"id\":\"bot1\",\"username\":\"Bot1\",\"title\":\"BOT\"}\n{\"id\":\"bot2\",\"username\":\"Bot2\"}\n";
     Mock::given(method("GET"))
         .and(path("/api/bot/online"))
+        .and(query_param("nb", "50"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
-    let stream = client(&server).bot().online().await.unwrap();
+    let stream = client(&server).bot().online(Some(50)).await.unwrap();
     let bots: Vec<_> = stream.collect().await;
 
     assert_eq!(bots.len(), 2);

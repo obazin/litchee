@@ -117,11 +117,38 @@ async fn results_streams_rows() {
         .mount(&server)
         .await;
 
-    let stream = client(&server).arena().results("abc").await.unwrap();
+    let stream = client(&server)
+        .arena()
+        .results("abc", None, None)
+        .await
+        .unwrap();
     let results: Vec<_> = stream.collect().await;
 
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].as_ref().unwrap().username, "A");
+}
+
+#[tokio::test]
+async fn results_sends_nb_and_sheet() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/tournament/abc/results"))
+        .and(query_param("nb", "10"))
+        .and(query_param("sheet", "true"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string("{\"rank\":1,\"score\":20,\"username\":\"A\",\"rating\":2400}\n"),
+        )
+        .mount(&server)
+        .await;
+
+    let stream = client(&server)
+        .arena()
+        .results("abc", Some(10), Some(true))
+        .await
+        .unwrap();
+    let results: Vec<_> = stream.collect().await;
+    assert_eq!(results.len(), 1);
 }
 
 #[tokio::test]
@@ -217,10 +244,16 @@ async fn created_by_streams_arenas() {
     let body = "{\"id\":\"a\"}\n{\"id\":\"b\"}\n";
     Mock::given(method("GET"))
         .and(path("/api/user/bob/tournament/created"))
+        .and(query_param("nb", "5"))
+        .and(query_param("status", "10"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
-    let stream = client(&server).arena().created_by("bob").await.unwrap();
+    let stream = client(&server)
+        .arena()
+        .created_by("bob", Some(5), &[10, 20])
+        .await
+        .unwrap();
     let arenas: Vec<_> = stream.collect().await;
     assert_eq!(arenas.len(), 2);
 }
@@ -231,10 +264,11 @@ async fn get_returns_full_arena() {
     let body = r#"{"id":"abc","fullName":"Hourly","nbPlayers":50}"#;
     Mock::given(method("GET"))
         .and(path("/api/tournament/abc"))
+        .and(query_param("page", "2"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
-    let arena = client(&server).arena().get("abc").await.unwrap();
+    let arena = client(&server).arena().get("abc", Some(2)).await.unwrap();
     assert_eq!(arena.id, "abc");
 }
 
@@ -262,10 +296,16 @@ async fn played_by_streams_arenas() {
     let body = "{\"id\":\"a\"}\n{\"id\":\"b\"}\n";
     Mock::given(method("GET"))
         .and(path("/api/user/bob/tournament/played"))
+        .and(query_param("nb", "3"))
+        .and(query_param("performance", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
-    let stream = client(&server).arena().played_by("bob").await.unwrap();
+    let stream = client(&server)
+        .arena()
+        .played_by("bob", Some(3), Some(true))
+        .await
+        .unwrap();
     let arenas: Vec<_> = stream.collect().await;
     assert_eq!(arenas.len(), 2);
 }
