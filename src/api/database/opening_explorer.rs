@@ -13,14 +13,6 @@ use crate::error::Result;
 use crate::http;
 use crate::model::{LichessColor, LichessSpeed};
 
-/// Query parameters shared by the masters and Lichess explorers.
-#[derive(Debug, Serialize)]
-struct ExplorerQuery<'a> {
-    fen: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    play: Option<&'a str>,
-}
-
 /// A player-rating band the Lichess games explorer can be filtered to. Each
 /// value is the inclusive lower bound of a 200-point band (`R0` = below 1000,
 /// `R2500` = 2500 and above).
@@ -84,92 +76,356 @@ impl RatingGroup {
     }
 }
 
-/// Filter parameters for the Lichess games explorer ([`OpeningExplorerApi::lichess`]).
-///
-/// All fields are optional; [`Default`] is the unfiltered query (every speed and
-/// rating band). An empty `speeds`/`ratings` slice means "no restriction".
-#[derive(Debug, Clone, Default)]
-pub struct LichessExplorerParams<'a> {
-    /// Comma-separated UCI moves to apply to `fen` before the lookup.
-    pub play: Option<&'a str>,
-    /// Chess variant (defaults to standard when unset).
-    pub variant: Option<&'a str>,
-    /// Restrict to these game speeds (empty = all).
-    pub speeds: &'a [LichessSpeed],
-    /// Restrict to these rating bands (empty = all).
-    pub ratings: &'a [RatingGroup],
-    /// Only games from this `YYYY-MM` or later.
-    pub since: Option<&'a str>,
-    /// Only games from this `YYYY-MM` or earlier.
-    pub until: Option<&'a str>,
-    /// Number of most-common moves to return.
-    pub moves: Option<u32>,
-    /// Number of top games to return.
-    pub top_games: Option<u32>,
-    /// Number of recent games to return.
-    pub recent_games: Option<u32>,
-    /// Whether to include the month-by-month history.
-    pub history: Option<bool>,
+/// A game mode the player explorer can be filtered to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExplorerMode {
+    /// Casual (unrated) games.
+    Casual,
+    /// Rated games.
+    Rated,
 }
 
-/// Builds the `/lichess` query string from `fen` + `params`. Empty / unset
-/// fields are omitted. Extracted from [`OpeningExplorerApi::lichess`] so it can
-/// be unit-tested without a client.
-fn build_lichess_query(fen: &str, params: &LichessExplorerParams<'_>) -> Vec<(&'static str, String)> {
-    let mut query: Vec<(&'static str, String)> = vec![("fen", fen.to_owned())];
-    if let Some(play) = params.play {
-        query.push(("play", play.to_owned()));
+impl ExplorerMode {
+    /// The wire representation, `"casual"` or `"rated"`.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ExplorerMode::Casual => "casual",
+            ExplorerMode::Rated => "rated",
+        }
     }
-    if let Some(variant) = params.variant {
-        query.push(("variant", variant.to_owned()));
-    }
-    if !params.speeds.is_empty() {
-        let speeds = params
-            .speeds
-            .iter()
-            .map(|speed| speed.as_str())
-            .collect::<Vec<_>>()
-            .join(",");
-        query.push(("speeds", speeds));
-    }
-    if !params.ratings.is_empty() {
-        let ratings = params
-            .ratings
-            .iter()
-            .map(|rating| rating.as_u16().to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-        query.push(("ratings", ratings));
-    }
-    if let Some(since) = params.since {
-        query.push(("since", since.to_owned()));
-    }
-    if let Some(until) = params.until {
-        query.push(("until", until.to_owned()));
-    }
-    if let Some(moves) = params.moves {
-        query.push(("moves", moves.to_string()));
-    }
-    if let Some(top_games) = params.top_games {
-        query.push(("topGames", top_games.to_string()));
-    }
-    if let Some(recent_games) = params.recent_games {
-        query.push(("recentGames", recent_games.to_string()));
-    }
-    if let Some(history) = params.history {
-        query.push(("history", history.to_string()));
-    }
-    query
 }
 
-/// Query parameters for the player explorer.
-#[derive(Debug, Serialize)]
-struct PlayerQuery<'a> {
-    player: &'a str,
-    color: &'a str,
+/// Comma-joins string parts into the wire form, or `None` when there are none
+/// (an empty filter means "no restriction", so the param is omitted). Borrows
+/// the parts, so `&'static str` enum encodings are joined without a per-element
+/// allocation.
+fn join_csv<'s>(parts: impl Iterator<Item = &'s str>) -> Option<String> {
+    let joined = parts.collect::<Vec<_>>().join(",");
+    (!joined.is_empty()).then_some(joined)
+}
+
+/// Serializable `/masters` query. `since`/`until` are calendar years.
+#[derive(Debug, Default, Serialize)]
+struct MastersQuery<'a> {
     fen: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     play: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    since: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    until: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    moves: Option<u32>,
+    #[serde(rename = "topGames", skip_serializing_if = "Option::is_none")]
+    top_games: Option<u32>,
+}
+
+/// Serializable `/lichess` query. `speeds`/`ratings` are pre-joined.
+#[derive(Debug, Default, Serialize)]
+struct LichessQuery<'a> {
+    fen: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    play: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    variant: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    speeds: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ratings: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    since: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    until: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    moves: Option<u32>,
+    #[serde(rename = "topGames", skip_serializing_if = "Option::is_none")]
+    top_games: Option<u32>,
+    #[serde(rename = "recentGames", skip_serializing_if = "Option::is_none")]
+    recent_games: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    history: Option<bool>,
+}
+
+/// Serializable `/player` query. `speeds`/`modes` are pre-joined.
+#[derive(Debug, Default, Serialize)]
+struct PlayerQuery<'a> {
+    player: &'a str,
+    color: LichessColor,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    variant: Option<&'a str>,
+    fen: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    play: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    speeds: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    modes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    since: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    until: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    moves: Option<u32>,
+    #[serde(rename = "recentGames", skip_serializing_if = "Option::is_none")]
+    recent_games: Option<u32>,
+}
+
+/// Builder for a masters-database lookup. Finish with [`send`](Self::send).
+#[derive(Debug)]
+pub struct MastersExplorerRequest<'a> {
+    client: &'a LichessClient,
+    query: MastersQuery<'a>,
+}
+
+impl<'a> MastersExplorerRequest<'a> {
+    /// Creates the request builder for the position `fen`.
+    pub(crate) fn new(client: &'a LichessClient, fen: &'a str) -> Self {
+        Self {
+            client,
+            query: MastersQuery {
+                fen,
+                ..Default::default()
+            },
+        }
+    }
+
+    /// Comma-separated UCI moves to apply to `fen` before the lookup.
+    #[must_use]
+    pub fn play(mut self, play: &'a str) -> Self {
+        self.query.play = Some(play);
+        self
+    }
+
+    /// Only games from this year or later.
+    #[must_use]
+    pub fn since(mut self, year: u16) -> Self {
+        self.query.since = Some(year);
+        self
+    }
+
+    /// Only games from this year or earlier.
+    #[must_use]
+    pub fn until(mut self, year: u16) -> Self {
+        self.query.until = Some(year);
+        self
+    }
+
+    /// Number of most-common moves to return.
+    #[must_use]
+    pub fn moves(mut self, moves: u32) -> Self {
+        self.query.moves = Some(moves);
+        self
+    }
+
+    /// Number of top games to return (max 15).
+    #[must_use]
+    pub fn top_games(mut self, count: u32) -> Self {
+        self.query.top_games = Some(count);
+        self
+    }
+
+    /// Executes the lookup. `GET /masters`
+    pub async fn send(self) -> Result<LichessExplorerResult> {
+        let request = self
+            .client
+            .request(Method::GET, Host::OpeningExplorer, "/masters")
+            .query(&self.query);
+        http::json(request, "LichessExplorerResult").await
+    }
+}
+
+/// Builder for a Lichess games lookup. Finish with [`send`](Self::send).
+#[derive(Debug)]
+pub struct LichessExplorerRequest<'a> {
+    client: &'a LichessClient,
+    query: LichessQuery<'a>,
+}
+
+impl<'a> LichessExplorerRequest<'a> {
+    /// Creates the request builder for the position `fen`.
+    pub(crate) fn new(client: &'a LichessClient, fen: &'a str) -> Self {
+        Self {
+            client,
+            query: LichessQuery {
+                fen,
+                ..Default::default()
+            },
+        }
+    }
+
+    /// Comma-separated UCI moves to apply to `fen` before the lookup.
+    #[must_use]
+    pub fn play(mut self, play: &'a str) -> Self {
+        self.query.play = Some(play);
+        self
+    }
+
+    /// Chess variant (defaults to standard when unset).
+    #[must_use]
+    pub fn variant(mut self, variant: &'a str) -> Self {
+        self.query.variant = Some(variant);
+        self
+    }
+
+    /// Restrict to these game speeds (empty = all).
+    #[must_use]
+    pub fn speeds(mut self, speeds: &[LichessSpeed]) -> Self {
+        self.query.speeds = join_csv(speeds.iter().map(|s| s.as_str()));
+        self
+    }
+
+    /// Restrict to these rating bands (empty = all).
+    #[must_use]
+    pub fn ratings(mut self, ratings: &[RatingGroup]) -> Self {
+        let values: Vec<String> = ratings.iter().map(|r| r.as_u16().to_string()).collect();
+        self.query.ratings = join_csv(values.iter().map(String::as_str));
+        self
+    }
+
+    /// Only games from this `YYYY-MM` or later.
+    #[must_use]
+    pub fn since(mut self, since: &'a str) -> Self {
+        self.query.since = Some(since);
+        self
+    }
+
+    /// Only games from this `YYYY-MM` or earlier.
+    #[must_use]
+    pub fn until(mut self, until: &'a str) -> Self {
+        self.query.until = Some(until);
+        self
+    }
+
+    /// Number of most-common moves to return.
+    #[must_use]
+    pub fn moves(mut self, moves: u32) -> Self {
+        self.query.moves = Some(moves);
+        self
+    }
+
+    /// Number of top games to return (max 4).
+    #[must_use]
+    pub fn top_games(mut self, count: u32) -> Self {
+        self.query.top_games = Some(count);
+        self
+    }
+
+    /// Number of recent games to return (max 4).
+    #[must_use]
+    pub fn recent_games(mut self, count: u32) -> Self {
+        self.query.recent_games = Some(count);
+        self
+    }
+
+    /// Whether to include the month-by-month history.
+    #[must_use]
+    pub fn history(mut self, history: bool) -> Self {
+        self.query.history = Some(history);
+        self
+    }
+
+    /// Executes the lookup. `GET /lichess`
+    pub async fn send(self) -> Result<LichessExplorerResult> {
+        let request = self
+            .client
+            .request(Method::GET, Host::OpeningExplorer, "/lichess")
+            .query(&self.query);
+        http::json(request, "LichessExplorerResult").await
+    }
+}
+
+/// Builder for a player games lookup. Finish with [`stream`](Self::stream).
+#[derive(Debug)]
+pub struct PlayerExplorerRequest<'a> {
+    client: &'a LichessClient,
+    query: PlayerQuery<'a>,
+}
+
+impl<'a> PlayerExplorerRequest<'a> {
+    /// Creates the request builder for `player` on `color` at position `fen`.
+    pub(crate) fn new(
+        client: &'a LichessClient,
+        player: &'a str,
+        color: LichessColor,
+        fen: &'a str,
+    ) -> Self {
+        Self {
+            client,
+            query: PlayerQuery {
+                player,
+                color,
+                fen,
+                ..Default::default()
+            },
+        }
+    }
+
+    /// Comma-separated UCI moves to apply to `fen` before the lookup.
+    #[must_use]
+    pub fn play(mut self, play: &'a str) -> Self {
+        self.query.play = Some(play);
+        self
+    }
+
+    /// Chess variant (defaults to standard when unset).
+    #[must_use]
+    pub fn variant(mut self, variant: &'a str) -> Self {
+        self.query.variant = Some(variant);
+        self
+    }
+
+    /// Restrict to these game speeds (empty = all).
+    #[must_use]
+    pub fn speeds(mut self, speeds: &[LichessSpeed]) -> Self {
+        self.query.speeds = join_csv(speeds.iter().map(|s| s.as_str()));
+        self
+    }
+
+    /// Restrict to these game modes (empty = all).
+    #[must_use]
+    pub fn modes(mut self, modes: &[ExplorerMode]) -> Self {
+        self.query.modes = join_csv(modes.iter().map(|m| m.as_str()));
+        self
+    }
+
+    /// Only games from this `YYYY-MM` or later.
+    #[must_use]
+    pub fn since(mut self, since: &'a str) -> Self {
+        self.query.since = Some(since);
+        self
+    }
+
+    /// Only games from this `YYYY-MM` or earlier.
+    #[must_use]
+    pub fn until(mut self, until: &'a str) -> Self {
+        self.query.until = Some(until);
+        self
+    }
+
+    /// Number of most-common moves to return.
+    #[must_use]
+    pub fn moves(mut self, moves: u32) -> Self {
+        self.query.moves = Some(moves);
+        self
+    }
+
+    /// Number of recent games to return (max 8).
+    #[must_use]
+    pub fn recent_games(mut self, count: u32) -> Self {
+        self.query.recent_games = Some(count);
+        self
+    }
+
+    /// Executes the lookup, streaming results as they are computed (NDJSON).
+    /// `GET /player`
+    pub async fn stream(self) -> Result<BoxStream<'static, Result<LichessExplorerResult>>> {
+        let request = self
+            .client
+            .request(Method::GET, Host::OpeningExplorer, "/player")
+            .query(&self.query);
+        http::stream(request, self.client.max_line_bytes()).await
+    }
 }
 
 /// Accessor for the Opening Explorer API.
@@ -186,50 +442,34 @@ impl<'a> OpeningExplorerApi<'a> {
 
     /// Looks up a position in the masters database. `GET /masters`
     ///
-    /// `play` is an optional comma-separated list of UCI moves to apply to the
-    /// position given by `fen`.
-    pub async fn masters(&self, fen: &str, play: Option<&str>) -> Result<LichessExplorerResult> {
-        self.lookup("/masters", fen, play).await
+    /// Returns a builder; refine it (date range, counts) and finish with
+    /// [`MastersExplorerRequest::send`].
+    #[must_use]
+    pub fn masters(&self, fen: &'a str) -> MastersExplorerRequest<'a> {
+        MastersExplorerRequest::new(self.client, fen)
     }
 
     /// Looks up a position in the Lichess games database. `GET /lichess`
     ///
-    /// `params` filters the query by speed, rating band, date range, etc.;
-    /// [`LichessExplorerParams::default`] is the unfiltered lookup.
-    pub async fn lichess(
-        &self,
-        fen: &str,
-        params: &LichessExplorerParams<'_>,
-    ) -> Result<LichessExplorerResult> {
-        let query = build_lichess_query(fen, params);
-        let request = self
-            .client
-            .request(Method::GET, Host::OpeningExplorer, "/lichess")
-            .query(&query);
-        http::json(request, "LichessExplorerResult").await
+    /// Returns a builder; refine it (speeds, ratings, date range, …) and finish
+    /// with [`LichessExplorerRequest::send`].
+    #[must_use]
+    pub fn lichess(&self, fen: &'a str) -> LichessExplorerRequest<'a> {
+        LichessExplorerRequest::new(self.client, fen)
     }
 
-    /// Streams a player's opening statistics for a position (NDJSON).
+    /// Streams a player's opening statistics for a position. `GET /player`
     ///
-    /// The result is sent incrementally as it is computed. `GET /player`
-    pub async fn player(
+    /// Returns a builder; refine it (variant, speeds, modes, …) and finish with
+    /// [`PlayerExplorerRequest::stream`].
+    #[must_use]
+    pub fn player(
         &self,
-        player: &str,
-        color: &str,
-        fen: &str,
-        play: Option<&str>,
-    ) -> Result<BoxStream<'static, Result<LichessExplorerResult>>> {
-        let query = PlayerQuery {
-            player,
-            color,
-            fen,
-            play,
-        };
-        let request = self
-            .client
-            .request(Method::GET, Host::OpeningExplorer, "/player")
-            .query(&query);
-        http::stream(request, self.client.max_line_bytes()).await
+        player: &'a str,
+        color: LichessColor,
+        fen: &'a str,
+    ) -> PlayerExplorerRequest<'a> {
+        PlayerExplorerRequest::new(self.client, player, color, fen)
     }
 
     /// Downloads a master game as PGN. `GET /masters/pgn/{gameId}`
@@ -239,20 +479,6 @@ impl<'a> OpeningExplorerApi<'a> {
             .client
             .request(Method::GET, Host::OpeningExplorer, &path);
         http::text(request).await
-    }
-
-    /// Issues an explorer lookup against the explorer host.
-    async fn lookup(
-        &self,
-        path: &str,
-        fen: &str,
-        play: Option<&str>,
-    ) -> Result<LichessExplorerResult> {
-        let request = self
-            .client
-            .request(Method::GET, Host::OpeningExplorer, path)
-            .query(&ExplorerQuery { fen, play });
-        http::json(request, "LichessExplorerResult").await
     }
 }
 
@@ -364,6 +590,11 @@ pub struct LichessExplorerResult {
 mod tests {
     use super::*;
 
+    /// A client with no config — enough to build request builders offline.
+    fn client() -> LichessClient {
+        LichessClient::builder().build().expect("client builds")
+    }
+
     #[test]
     fn parses_explorer_result() {
         let json = r#"{"opening":{"eco":"B01","name":"Scandinavian"},
@@ -379,32 +610,75 @@ mod tests {
     }
 
     #[test]
-    fn default_params_query_is_fen_only() {
-        let query = build_lichess_query("thefen", &LichessExplorerParams::default());
-        assert_eq!(query, vec![("fen", "thefen".to_owned())]);
+    fn join_csv_omits_empty_and_comma_joins() {
+        assert_eq!(join_csv(std::iter::empty()), None);
+        assert_eq!(
+            join_csv(["a", "b", "c"].into_iter()),
+            Some("a,b,c".to_owned())
+        );
     }
 
     #[test]
-    fn speeds_and_ratings_are_comma_joined() {
-        let params = LichessExplorerParams {
-            speeds: &[LichessSpeed::Blitz, LichessSpeed::Rapid],
-            ratings: &[RatingGroup::R1600, RatingGroup::R1800],
-            ..Default::default()
-        };
-        let query = build_lichess_query("f", &params);
-        assert!(query.contains(&("speeds", "blitz,rapid".to_owned())));
-        assert!(query.contains(&("ratings", "1600,1800".to_owned())));
+    fn lichess_default_query_is_fen_only() {
+        let client = client();
+        let req = client.opening_explorer().lichess("thefen");
+        assert_eq!(req.query.fen, "thefen");
+        assert!(req.query.play.is_none() && req.query.speeds.is_none());
     }
 
     #[test]
-    fn empty_speeds_and_ratings_are_omitted() {
-        let params = LichessExplorerParams {
-            play: Some("e2e4"),
-            ..Default::default()
-        };
-        let query = build_lichess_query("f", &params);
-        assert!(query.iter().all(|(k, _)| *k != "speeds" && *k != "ratings"));
-        assert!(query.contains(&("play", "e2e4".to_owned())));
+    fn lichess_speeds_and_ratings_are_comma_joined() {
+        let client = client();
+        let req = client
+            .opening_explorer()
+            .lichess("f")
+            .speeds(&[LichessSpeed::Blitz, LichessSpeed::Rapid])
+            .ratings(&[RatingGroup::R1600, RatingGroup::R1800]);
+        assert_eq!(req.query.speeds.as_deref(), Some("blitz,rapid"));
+        assert_eq!(req.query.ratings.as_deref(), Some("1600,1800"));
+    }
+
+    #[test]
+    fn empty_filters_are_omitted_but_play_is_kept() {
+        let client = client();
+        let req = client
+            .opening_explorer()
+            .lichess("f")
+            .play("e2e4")
+            .speeds(&[])
+            .ratings(&[]);
+        assert_eq!(req.query.play, Some("e2e4"));
+        assert!(req.query.speeds.is_none() && req.query.ratings.is_none());
+    }
+
+    #[test]
+    fn masters_query_uses_year_bounds() {
+        let client = client();
+        let req = client
+            .opening_explorer()
+            .masters("f")
+            .since(1952)
+            .until(2020)
+            .top_games(15);
+        assert_eq!(req.query.since, Some(1952));
+        assert_eq!(req.query.until, Some(2020));
+        assert_eq!(req.query.top_games, Some(15));
+    }
+
+    #[test]
+    fn player_query_joins_speeds_and_modes() {
+        let client = client();
+        let req = client
+            .opening_explorer()
+            .player("bobby", LichessColor::Black, "f")
+            .speeds(&[LichessSpeed::Bullet])
+            .modes(&[ExplorerMode::Rated, ExplorerMode::Casual])
+            .recent_games(5);
+        assert_eq!(req.query.player, "bobby");
+        assert_eq!(req.query.color, LichessColor::Black);
+        assert_eq!(req.query.speeds.as_deref(), Some("bullet"));
+        assert_eq!(req.query.modes.as_deref(), Some("rated,casual"));
+        assert_eq!(req.query.recent_games, Some(5));
     }
 
     #[test]
@@ -413,5 +687,11 @@ mod tests {
             assert_eq!(RatingGroup::from_u16(group.as_u16()), Some(group));
         }
         assert_eq!(RatingGroup::from_u16(1234), None);
+    }
+
+    #[test]
+    fn explorer_mode_wire_values() {
+        assert_eq!(ExplorerMode::Casual.as_str(), "casual");
+        assert_eq!(ExplorerMode::Rated.as_str(), "rated");
     }
 }

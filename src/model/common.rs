@@ -3,10 +3,11 @@
 use serde::{Deserialize, Serialize};
 
 /// A side of the board.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LichessColor {
-    /// The white pieces.
+    /// The white pieces (the conventional default, e.g. the side to move first).
+    #[default]
     White,
     /// The black pieces.
     Black,
