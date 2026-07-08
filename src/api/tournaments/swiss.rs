@@ -183,9 +183,15 @@ impl<'a> SwissApi<'a> {
         )
     }
 
-    /// Joins a swiss tournament. `POST /api/swiss/{id}/join`
-    pub async fn join(&self, id: &str) -> Result<()> {
-        self.post_action(id, "join").await
+    /// Joins a swiss tournament, optionally with an entry `password`.
+    /// `POST /api/swiss/{id}/join`
+    pub async fn join(&self, id: &str, password: Option<&str>) -> Result<()> {
+        let path = format!("/api/swiss/{}/join", http::segment(id));
+        let request = self
+            .client
+            .request(Method::POST, Host::Default, &path)
+            .form(&[("password", password)]);
+        http::ok(request).await
     }
 
     /// Withdraws from a swiss tournament. `POST /api/swiss/{id}/withdraw`
@@ -198,12 +204,15 @@ impl<'a> SwissApi<'a> {
         self.post_action(id, "terminate").await
     }
 
-    /// Manually schedules the next round.
+    /// Manually schedules the next round at `date` (Unix milliseconds).
     /// `POST /api/swiss/{id}/schedule-next-round`
-    pub async fn schedule_next_round(&self, id: &str) -> Result<()> {
-        self.post_action(id, "schedule-next-round")
-            .await
-            .map_err(map_unauthorized_edit)
+    pub async fn schedule_next_round(&self, id: &str, date: Option<i64>) -> Result<()> {
+        let path = format!("/api/swiss/{}/schedule-next-round", http::segment(id));
+        let request = self
+            .client
+            .request(Method::POST, Host::Default, &path)
+            .form(&[("date", date)]);
+        http::ok(request).await.map_err(map_unauthorized_edit)
     }
 
     /// Downloads the tournament in TRF format. `GET /swiss/{id}.trf`

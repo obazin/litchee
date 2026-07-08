@@ -112,11 +112,16 @@ async fn join_posts_to_the_join_path() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/api/swiss/abc/join"))
+        .and(body_string_contains("password=secret"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
         .mount(&server)
         .await;
 
-    client(&server).swiss().join("abc").await.unwrap();
+    client(&server)
+        .swiss()
+        .join("abc", Some("secret"))
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -218,7 +223,7 @@ async fn schedule_next_round_401_maps_to_swiss_unauthorized_edit() {
         .await;
     let err = client(&server)
         .swiss()
-        .schedule_next_round("abc")
+        .schedule_next_round("abc", None)
         .await
         .unwrap_err();
     assert!(matches!(
@@ -259,7 +264,7 @@ async fn schedule_next_round_posts_to_the_schedule_path() {
         .await;
     client(&server)
         .swiss()
-        .schedule_next_round("abc")
+        .schedule_next_round("abc", None)
         .await
         .unwrap();
 }

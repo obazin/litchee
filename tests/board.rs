@@ -151,6 +151,7 @@ async fn seek_streams_keepalive() {
     Mock::given(method("POST"))
         .and(path("/api/board/seek"))
         .and(body_string_contains("time=5"))
+        .and(body_string_contains("ratingRange=1500-1800"))
         .respond_with(ResponseTemplate::new(200).set_body_string("\n\n"))
         .mount(&server)
         .await;
@@ -159,6 +160,7 @@ async fn seek_streams_keepalive() {
         .seek()
         .rated(false)
         .clock(5.0, 3)
+        .rating_range("1500-1800")
         .send()
         .await
         .unwrap();
