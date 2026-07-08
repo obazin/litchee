@@ -135,6 +135,17 @@ impl<'a> ArenaConditions<'a> {
     }
 }
 
+/// Form body for joining an arena tournament.
+#[derive(Debug, Serialize)]
+struct JoinArenaForm<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    password: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    team: Option<&'a str>,
+    #[serde(rename = "pairMeAsap", skip_serializing_if = "Option::is_none")]
+    pair_me_asap: Option<bool>,
+}
+
 /// Accessor for the Arena Tournaments API.
 #[derive(Debug)]
 pub struct ArenaApi<'a> {
@@ -273,9 +284,27 @@ impl<'a> ArenaApi<'a> {
     }
 
     /// Joins a tournament. `POST /api/tournament/{id}/join`
-    pub async fn join(&self, id: &str) -> Result<()> {
+    ///
+    /// `password` is the entry code (or user-specific code); `team` picks the
+    /// team for a team battle; `pair_me_asap` requests immediate pairing.
+    pub async fn join(
+        &self,
+        id: &str,
+        password: Option<&str>,
+        team: Option<&str>,
+        pair_me_asap: Option<bool>,
+    ) -> Result<()> {
         let path = format!("/api/tournament/{}/join", http::segment(id));
-        http::ok(self.client.request(Method::POST, Host::Default, &path)).await
+        let form = JoinArenaForm {
+            password,
+            team,
+            pair_me_asap,
+        };
+        let request = self
+            .client
+            .request(Method::POST, Host::Default, &path)
+            .form(&form);
+        http::ok(request).await
     }
 
     /// Withdraws from a tournament. `POST /api/tournament/{id}/withdraw`

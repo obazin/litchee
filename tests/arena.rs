@@ -95,11 +95,16 @@ async fn join_posts_to_the_join_path() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/api/tournament/abc/join"))
+        .and(body_string_contains("password=code"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
         .mount(&server)
         .await;
 
-    client(&server).arena().join("abc").await.unwrap();
+    client(&server)
+        .arena()
+        .join("abc", Some("code"), None, None)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
