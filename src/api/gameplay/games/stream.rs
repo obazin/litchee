@@ -4,11 +4,12 @@ use futures_util::stream::BoxStream;
 use reqwest::Method;
 use reqwest::header::{ACCEPT, CONTENT_TYPE};
 
+use super::GamesApi;
 use super::model::{LichessGame, LichessGameMoveUpdate};
-use super::{GamesApi, NDJSON};
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
+use crate::http::ACCEPT_NDJSON;
 
 impl GamesApi<'_> {
     /// Streams the authenticated user's imported games (NDJSON).
@@ -17,7 +18,7 @@ impl GamesApi<'_> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/games/export/imports")
-            .header(ACCEPT, NDJSON);
+            .header(ACCEPT, ACCEPT_NDJSON);
         http::stream(request, self.client.max_line_bytes()).await
     }
 

@@ -26,6 +26,19 @@ struct ErrorBody {
     error: String,
 }
 
+/// `Accept` value selecting the newline-delimited JSON representation
+/// (`application/x-ndjson`), shared by the streaming game-export endpoints.
+pub(crate) const ACCEPT_NDJSON: &str = "application/x-ndjson";
+
+/// `Accept` value selecting the PGN representation (`application/x-chess-pgn`),
+/// shared by the game-export endpoints that can return PGN text.
+pub(crate) const ACCEPT_PGN: &str = "application/x-chess-pgn";
+
+/// `Accept` value selecting the JSON representation (`application/json`). The
+/// single-game and current-game exports default to PGN, so JSON is requested
+/// explicitly.
+pub(crate) const ACCEPT_JSON: &str = "application/json";
+
 /// Characters left literal in a path segment: the RFC 3986 unreserved set
 /// (`A-Z a-z 0-9 - . _ ~`). Everything else — including `/ ? # %` — is encoded.
 const PATH_SEGMENT: &AsciiSet = &NON_ALPHANUMERIC

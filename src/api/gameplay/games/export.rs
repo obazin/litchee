@@ -7,11 +7,11 @@ use reqwest::header::{ACCEPT, CONTENT_TYPE};
 use serde::Serialize;
 
 use super::model::LichessGame;
-use super::{JSON, NDJSON, PGN};
 use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
+use crate::http::{ACCEPT_JSON, ACCEPT_NDJSON, ACCEPT_PGN};
 use crate::model::GameExportOptions;
 
 /// Sort order for a games export.
@@ -71,7 +71,7 @@ impl<'a> GameExportRequest<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
-            .header(ACCEPT, JSON)
+            .header(ACCEPT, ACCEPT_JSON)
             .query(&self.filters)
             .query(&self.export);
         http::json(request, "LichessGame").await
@@ -83,7 +83,7 @@ impl<'a> GameExportRequest<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
-            .header(ACCEPT, PGN)
+            .header(ACCEPT, ACCEPT_PGN)
             .query(&self.filters)
             .query(&self.export);
         http::text(request).await
@@ -246,7 +246,7 @@ impl<'a> UserGamesRequest<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
-            .header(ACCEPT, NDJSON)
+            .header(ACCEPT, ACCEPT_NDJSON)
             .query(&self.query)
             .query(&self.export);
         http::stream(request, self.client.max_line_bytes()).await
@@ -258,7 +258,7 @@ impl<'a> UserGamesRequest<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
-            .header(ACCEPT, PGN)
+            .header(ACCEPT, ACCEPT_PGN)
             .query(&self.query)
             .query(&self.export);
         http::text(request).await
@@ -295,7 +295,7 @@ impl<'a> ExportByIdsRequest<'a> {
         let request = self
             .client
             .request(Method::POST, Host::Default, "/api/games/export/_ids")
-            .header(ACCEPT, NDJSON)
+            .header(ACCEPT, ACCEPT_NDJSON)
             .header(CONTENT_TYPE, "text/plain")
             .query(&self.export)
             .body(self.ids);
@@ -307,7 +307,7 @@ impl<'a> ExportByIdsRequest<'a> {
         let request = self
             .client
             .request(Method::POST, Host::Default, "/api/games/export/_ids")
-            .header(ACCEPT, PGN)
+            .header(ACCEPT, ACCEPT_PGN)
             .header(CONTENT_TYPE, "text/plain")
             .query(&self.export)
             .body(self.ids);
@@ -395,7 +395,7 @@ impl<'a> ExportBookmarksRequest<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/games/export/bookmarks")
-            .header(ACCEPT, NDJSON)
+            .header(ACCEPT, ACCEPT_NDJSON)
             .query(&self.query)
             .query(&self.export);
         http::stream(request, self.client.max_line_bytes()).await
@@ -406,7 +406,7 @@ impl<'a> ExportBookmarksRequest<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/games/export/bookmarks")
-            .header(ACCEPT, PGN)
+            .header(ACCEPT, ACCEPT_PGN)
             .query(&self.query)
             .query(&self.export);
         http::text(request).await
@@ -445,7 +445,7 @@ impl<'a> CurrentGameRequest<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
-            .header(ACCEPT, JSON)
+            .header(ACCEPT, ACCEPT_JSON)
             .query(&self.export);
         http::json(request, "LichessGame").await
     }
@@ -456,7 +456,7 @@ impl<'a> CurrentGameRequest<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
-            .header(ACCEPT, PGN)
+            .header(ACCEPT, ACCEPT_PGN)
             .query(&self.export);
         http::text(request).await
     }
