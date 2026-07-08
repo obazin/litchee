@@ -4,8 +4,10 @@
 
 use std::collections::HashMap;
 
+use futures_util::stream::BoxStream;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::api::gameplay::games::LichessGame;
 use crate::client::LichessClient;
@@ -228,14 +230,6 @@ impl<'a> ChallengeRequest<'a> {
         self
     }
 
-    /// Keeps the response stream open, emitting status updates until the
-    /// challenge is accepted, declined, or canceled.
-    #[must_use]
-    pub fn keep_alive_stream(mut self, value: bool) -> Self {
-        self.form.keep_alive_stream = Some(value);
-        self
-    }
-
     /// Sets extra game rules (comma-separated, e.g. `noRematch,noGiveTime`).
     #[must_use]
     pub fn rules(mut self, rules: &'a str) -> Self {
@@ -243,14 +237,27 @@ impl<'a> ChallengeRequest<'a> {
         self
     }
 
-    /// Sends the challenge.
+    /// Sends the challenge, returning it immediately.
     pub async fn send(self) -> Result<LichessChallenge> {
-        let path = format!("/api/challenge/{}", http::segment(self.username));
-        let request = self
-            .client
-            .request(Method::POST, Host::Default, &path)
-            .form(&self.form);
+        let request = self.request();
         http::json(request, "LichessChallenge").await
+    }
+
+    /// Sends the challenge with `keepAliveStream`, returning an NDJSON stream
+    /// that is held open and emits status updates (e.g. `{"done":"accepted"}`)
+    /// until the challenge is accepted, declined, or canceled.
+    pub async fn stream(mut self) -> Result<BoxStream<'static, Result<Value>>> {
+        self.form.keep_alive_stream = Some(true);
+        let request = self.request();
+        http::stream(request, self.client.max_line_bytes()).await
+    }
+
+    /// Builds the POST request for the challenge form.
+    fn request(&self) -> http::ApiRequest {
+        let path = format!("/api/challenge/{}", http::segment(self.username));
+        self.client
+            .request(Method::POST, Host::Default, &path)
+            .form(&self.form)
     }
 }
 

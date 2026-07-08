@@ -1,5 +1,6 @@
 //! Integration tests for the Challenges API.
 
+use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::gameplay::challenges::LichessChallengeColor;
 use wiremock::matchers::{body_string_contains, method, path, query_param};
@@ -37,7 +38,6 @@ async fn challenge_user_posts_clock_form_fields() {
         .and(path("/api/challenge/bobby"))
         .and(body_string_contains("clock.limit=600"))
         .and(body_string_contains("color=white"))
-        .and(body_string_contains("keepAliveStream=true"))
         .and(body_string_contains("rules=noRematch"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
@@ -49,13 +49,35 @@ async fn challenge_user_posts_clock_form_fields() {
         .rated(true)
         .clock(600, 0)
         .color(LichessChallengeColor::White)
-        .keep_alive_stream(true)
         .rules("noRematch")
         .send()
         .await
         .unwrap();
 
     assert_eq!(challenge.id, "H9fIRZUk");
+}
+
+#[tokio::test]
+async fn challenge_stream_sends_keep_alive_and_streams_status() {
+    let server = MockServer::start().await;
+    let body = "{\"challenge\":{\"id\":\"c1\"}}\n{\"done\":\"accepted\"}\n";
+    Mock::given(method("POST"))
+        .and(path("/api/challenge/bobby"))
+        .and(body_string_contains("keepAliveStream=true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server)
+        .challenges()
+        .challenge("bobby")
+        .clock(600, 0)
+        .stream()
+        .await
+        .unwrap();
+    let updates: Vec<_> = stream.collect().await;
+    assert_eq!(updates.len(), 2);
+    assert_eq!(updates[1].as_ref().unwrap()["done"], "accepted");
 }
 
 #[tokio::test]
