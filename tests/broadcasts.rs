@@ -2,6 +2,7 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
+use litchee::api::broadcasting::broadcasts::BroadcastTourInfo;
 use wiremock::matchers::{body_string_contains, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -118,13 +119,23 @@ async fn create_tour_posts_to_new() {
     Mock::given(method("POST"))
         .and(path("/broadcast/new"))
         .and(body_string_contains("name=My+Tour"))
+        .and(body_string_contains("tier=5"))
+        .and(body_string_contains("showScores=true"))
+        .and(body_string_contains("info.format=8-player+round-robin"))
+        .and(body_string_contains("info.tc=Classical"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
     let tour = client(&server)
         .broadcasts()
         .create_tour("My Tour")
-        .info("desc")
+        .tier(5)
+        .show_scores(true)
+        .info(
+            BroadcastTourInfo::default()
+                .format("8-player round-robin")
+                .tc("Classical"),
+        )
         .send()
         .await
         .unwrap();
@@ -355,6 +366,58 @@ async fn create_round_posts_to_new() {
     let view = client(&server)
         .broadcasts()
         .create_round("t1", "Round 1")
+        .send()
+        .await
+        .unwrap();
+
+    assert!(view.round.is_some());
+}
+
+#[tokio::test]
+async fn create_round_posts_sync_and_scoring_fields() {
+    let server = MockServer::start().await;
+    let body = r#"{"round":{"id":"r1"},"games":[]}"#;
+    Mock::given(method("POST"))
+        .and(path("/broadcast/t1/new"))
+        .and(body_string_contains("syncUrl=https"))
+        .and(body_string_contains("period=30"))
+        .and(body_string_contains("rated=true"))
+        .and(body_string_contains("onlyRound=3"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let view = client(&server)
+        .broadcasts()
+        .create_round("t1", "Round 1")
+        .sync_url("https://example.org/games.pgn")
+        .period(30)
+        .rated(true)
+        .only_round(3)
+        .send()
+        .await
+        .unwrap();
+
+    assert!(view.round.is_some());
+}
+
+#[tokio::test]
+async fn update_round_sends_patch_query() {
+    let server = MockServer::start().await;
+    let body = r#"{"round":{"id":"r1"},"games":[]}"#;
+    Mock::given(method("POST"))
+        .and(path("/broadcast/round/r1/edit"))
+        .and(query_param("patch", "true"))
+        .and(body_string_contains("delay=60"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let view = client(&server)
+        .broadcasts()
+        .update_round("r1", "Round 1")
+        .delay(60)
+        .patch(true)
         .send()
         .await
         .unwrap();

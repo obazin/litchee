@@ -206,6 +206,11 @@ impl<'a> BroadcastsApi<'a> {
     }
 
     /// Starts editing a round. `POST /broadcast/round/{roundId}/edit`
+    ///
+    /// The edit endpoint **replaces** the round: any field left unset is blanked
+    /// (dropping the existing sync source, start time, etc.). Call
+    /// [`RoundRequest::patch`] with `true` to instead update only the fields you
+    /// set and leave the rest untouched.
     #[must_use]
     pub fn update_round(&self, round_id: &'a str, name: &'a str) -> RoundRequest<'a> {
         RoundRequest::new(self.client, round_id, true, name)
@@ -220,14 +225,115 @@ impl LichessClient {
     }
 }
 
-/// Form body for creating/editing a broadcast tournament.
-#[derive(Debug, Serialize)]
+/// Form body for creating/editing a broadcast tournament (flat, non-`info`
+/// fields).
+#[derive(Debug, Default, Serialize)]
 struct TourForm<'a> {
     name: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
-    info: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     visibility: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    markdown: Option<&'a str>,
+    #[serde(rename = "showScores", skip_serializing_if = "Option::is_none")]
+    show_scores: Option<bool>,
+    #[serde(rename = "showRatingDiffs", skip_serializing_if = "Option::is_none")]
+    show_rating_diffs: Option<bool>,
+    #[serde(rename = "teamTable", skip_serializing_if = "Option::is_none")]
+    team_table: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    players: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    teams: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tier: Option<u8>,
+}
+
+/// Display information for a broadcast tournament, serialized as `info.*` keys.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct BroadcastTourInfo<'a> {
+    #[serde(rename = "info.format", skip_serializing_if = "Option::is_none")]
+    format: Option<&'a str>,
+    #[serde(rename = "info.tc", skip_serializing_if = "Option::is_none")]
+    tc: Option<&'a str>,
+    #[serde(rename = "info.fideTC", skip_serializing_if = "Option::is_none")]
+    fide_tc: Option<&'a str>,
+    #[serde(rename = "info.timeZone", skip_serializing_if = "Option::is_none")]
+    time_zone: Option<&'a str>,
+    #[serde(rename = "info.location", skip_serializing_if = "Option::is_none")]
+    location: Option<&'a str>,
+    #[serde(rename = "info.players", skip_serializing_if = "Option::is_none")]
+    players: Option<&'a str>,
+    #[serde(rename = "info.website", skip_serializing_if = "Option::is_none")]
+    website: Option<&'a str>,
+    #[serde(rename = "info.standings", skip_serializing_if = "Option::is_none")]
+    standings: Option<&'a str>,
+    #[serde(rename = "info.regulations", skip_serializing_if = "Option::is_none")]
+    regulations: Option<&'a str>,
+}
+
+impl<'a> BroadcastTourInfo<'a> {
+    /// Tournament format, e.g. `"8-player round-robin"`.
+    #[must_use]
+    pub fn format(mut self, format: &'a str) -> Self {
+        self.format = Some(format);
+        self
+    }
+
+    /// Time control, e.g. `"Classical"` or `"Rapid & Blitz"`.
+    #[must_use]
+    pub fn tc(mut self, tc: &'a str) -> Self {
+        self.tc = Some(tc);
+        self
+    }
+
+    /// FIDE rating category (`standard`, `rapid`, or `blitz`).
+    #[must_use]
+    pub fn fide_tc(mut self, fide_tc: &'a str) -> Self {
+        self.fide_tc = Some(fide_tc);
+        self
+    }
+
+    /// Timezone identifier, e.g. `America/New_York`.
+    #[must_use]
+    pub fn time_zone(mut self, time_zone: &'a str) -> Self {
+        self.time_zone = Some(time_zone);
+        self
+    }
+
+    /// Tournament location.
+    #[must_use]
+    pub fn location(mut self, location: &'a str) -> Self {
+        self.location = Some(location);
+        self
+    }
+
+    /// Up to four of the best participating players.
+    #[must_use]
+    pub fn players(mut self, players: &'a str) -> Self {
+        self.players = Some(players);
+        self
+    }
+
+    /// Official website URL.
+    #[must_use]
+    pub fn website(mut self, website: &'a str) -> Self {
+        self.website = Some(website);
+        self
+    }
+
+    /// Official standings website URL.
+    #[must_use]
+    pub fn standings(mut self, standings: &'a str) -> Self {
+        self.standings = Some(standings);
+        self
+    }
+
+    /// External URL to the tournament regulations.
+    #[must_use]
+    pub fn regulations(mut self, regulations: &'a str) -> Self {
+        self.regulations = Some(regulations);
+        self
+    }
 }
 
 /// Builder for creating or editing a broadcast tournament.
@@ -236,6 +342,7 @@ pub struct TourRequest<'a> {
     client: &'a LichessClient,
     edit_id: Option<&'a str>,
     form: TourForm<'a>,
+    info: BroadcastTourInfo<'a>,
 }
 
 impl<'a> TourRequest<'a> {
@@ -246,16 +353,16 @@ impl<'a> TourRequest<'a> {
             edit_id,
             form: TourForm {
                 name,
-                info: None,
-                visibility: None,
+                ..Default::default()
             },
+            info: BroadcastTourInfo::default(),
         }
     }
 
-    /// Sets the short description shown on the broadcast.
+    /// Sets the structured display information.
     #[must_use]
-    pub fn info(mut self, info: &'a str) -> Self {
-        self.form.info = Some(info);
+    pub fn info(mut self, info: BroadcastTourInfo<'a>) -> Self {
+        self.info = info;
         self
     }
 
@@ -266,6 +373,60 @@ impl<'a> TourRequest<'a> {
         self
     }
 
+    /// Sets a long Markdown description.
+    #[must_use]
+    pub fn markdown(mut self, markdown: &'a str) -> Self {
+        self.form.markdown = Some(markdown);
+        self
+    }
+
+    /// Sets whether to show player scores.
+    #[must_use]
+    pub fn show_scores(mut self, value: bool) -> Self {
+        self.form.show_scores = Some(value);
+        self
+    }
+
+    /// Sets whether to show rating differences.
+    #[must_use]
+    pub fn show_rating_diffs(mut self, value: bool) -> Self {
+        self.form.show_rating_diffs = Some(value);
+        self
+    }
+
+    /// Sets whether to display a team table.
+    #[must_use]
+    pub fn team_table(mut self, value: bool) -> Self {
+        self.form.team_table = Some(value);
+        self
+    }
+
+    /// Sets player tags / overrides (one line per player).
+    #[must_use]
+    pub fn players(mut self, players: &'a str) -> Self {
+        self.form.players = Some(players);
+        self
+    }
+
+    /// Assigns players to teams (one line per player).
+    #[must_use]
+    pub fn teams(mut self, teams: &'a str) -> Self {
+        self.form.teams = Some(teams);
+        self
+    }
+
+    /// Sets the broadcast tier (`3`, `4`, or `5`).
+    #[must_use]
+    pub fn tier(mut self, tier: u8) -> Self {
+        self.form.tier = Some(tier);
+        self
+    }
+
+    // NOTE: `tiebreaks` (an array) and `grouping` (a nested object with an
+    // inner array) are intentionally not exposed yet — they need array /
+    // nested form-key encoding that the flat value-type approach does not
+    // cover. Tracked as a follow-up gap.
+
     /// Creates or updates the tournament.
     pub async fn send(self) -> Result<LichessBroadcast> {
         let path = match self.edit_id {
@@ -275,19 +436,48 @@ impl<'a> TourRequest<'a> {
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .form(&self.form);
+            .form_parts(&self.form, &self.info);
         http::json(request, "LichessBroadcast").await
     }
 }
 
 /// Form body for creating/editing a broadcast round.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 struct RoundForm<'a> {
     name: &'a str,
     #[serde(rename = "syncUrl", skip_serializing_if = "Option::is_none")]
     sync_url: Option<&'a str>,
+    #[serde(rename = "syncUrls", skip_serializing_if = "Option::is_none")]
+    sync_urls: Option<&'a str>,
+    #[serde(rename = "syncIds", skip_serializing_if = "Option::is_none")]
+    sync_ids: Option<&'a str>,
+    #[serde(rename = "syncUsers", skip_serializing_if = "Option::is_none")]
+    sync_users: Option<&'a str>,
+    #[serde(rename = "onlyRound", skip_serializing_if = "Option::is_none")]
+    only_round: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    slices: Option<&'a str>,
+    #[serde(rename = "syncSource", skip_serializing_if = "Option::is_none")]
+    sync_source: Option<&'a str>,
     #[serde(rename = "startsAt", skip_serializing_if = "Option::is_none")]
     starts_at: Option<i64>,
+    #[serde(
+        rename = "startsAfterPrevious",
+        skip_serializing_if = "Option::is_none"
+    )]
+    starts_after_previous: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    delay: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    period: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rated: Option<bool>,
+    #[serde(rename = "customScoring", skip_serializing_if = "Option::is_none")]
+    custom_scoring: Option<&'a str>,
+    #[serde(rename = "teamCustomScoring", skip_serializing_if = "Option::is_none")]
+    team_custom_scoring: Option<&'a str>,
 }
 
 /// Builder for creating a round (under a tournament) or editing a round.
@@ -297,6 +487,7 @@ pub struct RoundRequest<'a> {
     /// Tournament id when creating, or round id when editing.
     target_id: &'a str,
     edit: bool,
+    patch: Option<bool>,
     form: RoundForm<'a>,
 }
 
@@ -312,18 +503,60 @@ impl<'a> RoundRequest<'a> {
             client,
             target_id,
             edit,
+            patch: None,
             form: RoundForm {
                 name,
-                sync_url: None,
-                starts_at: None,
+                ..Default::default()
             },
         }
     }
 
-    /// Sets a source URL to automatically sync games from.
+    /// Sets a single source URL to automatically sync games from.
     #[must_use]
     pub fn sync_url(mut self, url: &'a str) -> Self {
         self.form.sync_url = Some(url);
+        self
+    }
+
+    /// Sets multiple source URLs to sync games from (newline-separated).
+    #[must_use]
+    pub fn sync_urls(mut self, urls: &'a str) -> Self {
+        self.form.sync_urls = Some(urls);
+        self
+    }
+
+    /// Syncs games from these Lichess game ids (space/newline-separated).
+    #[must_use]
+    pub fn sync_ids(mut self, ids: &'a str) -> Self {
+        self.form.sync_ids = Some(ids);
+        self
+    }
+
+    /// Syncs games from these Lichess usernames.
+    #[must_use]
+    pub fn sync_users(mut self, users: &'a str) -> Self {
+        self.form.sync_users = Some(users);
+        self
+    }
+
+    /// Only import games matching this PGN `Round` tag.
+    #[must_use]
+    pub fn only_round(mut self, round: u32) -> Self {
+        self.form.only_round = Some(round);
+        self
+    }
+
+    /// Selects a subset of games from the source (slice expression).
+    #[must_use]
+    pub fn slices(mut self, slices: &'a str) -> Self {
+        self.form.slices = Some(slices);
+        self
+    }
+
+    /// Sets the sync source.
+    #[must_use]
+    pub fn sync_source(mut self, source: &'a str) -> Self {
+        self.form.sync_source = Some(source);
         self
     }
 
@@ -331,6 +564,63 @@ impl<'a> RoundRequest<'a> {
     #[must_use]
     pub fn starts_at(mut self, timestamp: i64) -> Self {
         self.form.starts_at = Some(timestamp);
+        self
+    }
+
+    /// Starts the round automatically after the previous one finishes.
+    #[must_use]
+    pub fn starts_after_previous(mut self, value: bool) -> Self {
+        self.form.starts_after_previous = Some(value);
+        self
+    }
+
+    /// Sets the broadcast delay, in seconds.
+    #[must_use]
+    pub fn delay(mut self, seconds: u32) -> Self {
+        self.form.delay = Some(seconds);
+        self
+    }
+
+    /// Sets the source polling period, in seconds.
+    #[must_use]
+    pub fn period(mut self, seconds: u32) -> Self {
+        self.form.period = Some(seconds);
+        self
+    }
+
+    /// Sets the round status.
+    #[must_use]
+    pub fn status(mut self, status: &'a str) -> Self {
+        self.form.status = Some(status);
+        self
+    }
+
+    /// Sets whether the round's games are rated.
+    #[must_use]
+    pub fn rated(mut self, value: bool) -> Self {
+        self.form.rated = Some(value);
+        self
+    }
+
+    /// Sets a custom scoring configuration.
+    #[must_use]
+    pub fn custom_scoring(mut self, scoring: &'a str) -> Self {
+        self.form.custom_scoring = Some(scoring);
+        self
+    }
+
+    /// Sets a custom team scoring configuration.
+    #[must_use]
+    pub fn team_custom_scoring(mut self, scoring: &'a str) -> Self {
+        self.form.team_custom_scoring = Some(scoring);
+        self
+    }
+
+    /// On an edit, merges the given fields rather than replacing the round
+    /// (`patch` query param).
+    #[must_use]
+    pub fn patch(mut self, value: bool) -> Self {
+        self.patch = Some(value);
         self
     }
 
@@ -344,6 +634,7 @@ impl<'a> RoundRequest<'a> {
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
+            .query(&[("patch", self.patch)])
             .form(&self.form);
         http::json(request, "LichessBroadcastRoundView").await
     }
@@ -444,6 +735,26 @@ mod tests {
         assert_eq!(broadcast.tour.name, "World Champ");
         assert_eq!(broadcast.rounds[0].id, "r1");
         assert_eq!(broadcast.rounds[0].finished, Some(false));
+    }
+
+    #[test]
+    fn tour_info_serializes_to_dotted_keys() {
+        let query = serde_urlencoded::to_string(
+            BroadcastTourInfo::default()
+                .format("8-player RR")
+                .fide_tc("standard"),
+        )
+        .unwrap();
+        assert!(query.contains("info.format=8-player+RR"));
+        assert!(query.contains("info.fideTC=standard"));
+    }
+
+    #[test]
+    fn empty_tour_info_serializes_to_nothing() {
+        assert_eq!(
+            serde_urlencoded::to_string(BroadcastTourInfo::default()).unwrap(),
+            ""
+        );
     }
 }
 
