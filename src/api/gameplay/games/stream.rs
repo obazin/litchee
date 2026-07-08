@@ -11,30 +11,6 @@ use crate::error::Result;
 use crate::http;
 
 impl GamesApi<'_> {
-    /// Exports several games by id (NDJSON). `POST /api/games/export/_ids`
-    pub async fn export_by_ids(
-        &self,
-        ids: &[&str],
-    ) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let request = self
-            .client
-            .request(Method::POST, Host::Default, "/api/games/export/_ids")
-            .header(ACCEPT, NDJSON)
-            .header(CONTENT_TYPE, "text/plain")
-            .body(ids.join(","));
-        http::stream(request, self.client.max_line_bytes()).await
-    }
-
-    /// Streams the authenticated user's bookmarked games (NDJSON).
-    /// `GET /api/games/export/bookmarks`
-    pub async fn export_bookmarks(&self) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let request = self
-            .client
-            .request(Method::GET, Host::Default, "/api/games/export/bookmarks")
-            .header(ACCEPT, NDJSON);
-        http::stream(request, self.client.max_line_bytes()).await
-    }
-
     /// Streams the authenticated user's imported games (NDJSON).
     /// `GET /api/games/export/imports`
     pub async fn export_imports(&self) -> Result<BoxStream<'static, Result<LichessGame>>> {
