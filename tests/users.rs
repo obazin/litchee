@@ -1,6 +1,7 @@
 //! Integration tests for the Users API.
 
 use litchee::LichessClient;
+use litchee::api::users::players::UserQuery;
 use wiremock::matchers::{body_string_contains, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -17,11 +18,17 @@ async fn get_returns_extended_user() {
     let body = r#"{"id":"bobby","username":"Bobby","url":"https://lichess.org/@/Bobby"}"#;
     Mock::given(method("GET"))
         .and(path("/api/user/bobby"))
+        .and(query_param("trophies", "true"))
+        .and(query_param("fideId", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
-    let user = client(&server).users().get("bobby").await.unwrap();
+    let user = client(&server)
+        .users()
+        .get("bobby", &UserQuery::default().trophies(true).fide_id(true))
+        .await
+        .unwrap();
 
     assert_eq!(user.user.username, "Bobby");
 }
@@ -32,12 +39,17 @@ async fn get_many_posts_comma_separated_ids() {
     let body = r#"[{"id":"a","username":"A"},{"id":"b","username":"B"}]"#;
     Mock::given(method("POST"))
         .and(path("/api/users"))
+        .and(query_param("profile", "true"))
         .and(body_string_contains("a,b"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
-    let users = client(&server).users().get_many(&["a", "b"]).await.unwrap();
+    let users = client(&server)
+        .users()
+        .get_many(&["a", "b"], Some(true), None)
+        .await
+        .unwrap();
 
     assert_eq!(users.len(), 2);
     assert_eq!(users[1].id, "b");
@@ -50,13 +62,15 @@ async fn statuses_queries_the_ids() {
     Mock::given(method("GET"))
         .and(path("/api/users/status"))
         .and(query_param("ids", "bobby,mary"))
+        .and(query_param("withSignal", "true"))
+        .and(query_param("withGameIds", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
     let statuses = client(&server)
         .users()
-        .statuses(&["bobby", "mary"])
+        .statuses(&["bobby", "mary"], Some(true), Some(true), None)
         .await
         .unwrap();
 
@@ -89,11 +103,20 @@ async fn autocomplete_returns_usernames() {
     Mock::given(method("GET"))
         .and(path("/api/player/autocomplete"))
         .and(query_param("term", "bob"))
+        .and(query_param("team", "coders"))
+        .and(query_param("friend", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"["bobby","bobbyfischer"]"#))
         .mount(&server)
         .await;
 
-    let names = client(&server).users().autocomplete("bob").await.unwrap();
+    let names = client(&server)
+        .users()
+        .autocomplete("bob")
+        .team("coders")
+        .friend(true)
+        .send()
+        .await
+        .unwrap();
 
     assert_eq!(names, vec!["bobby", "bobbyfischer"]);
 }
