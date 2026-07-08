@@ -3,7 +3,7 @@
 use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::gameplay::challenges::LichessChallengeColor;
-use wiremock::matchers::{body_string_contains, method, path, query_param};
+use wiremock::matchers::{body_string_contains, header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> LichessClient {
@@ -63,6 +63,7 @@ async fn challenge_stream_sends_keep_alive_and_streams_status() {
     let body = "{\"challenge\":{\"id\":\"c1\"}}\n{\"done\":\"accepted\"}\n";
     Mock::given(method("POST"))
         .and(path("/api/challenge/bobby"))
+        .and(header("accept", "application/x-ndjson"))
         .and(body_string_contains("keepAliveStream=true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
