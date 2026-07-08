@@ -11,7 +11,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
-use crate::model::LichessVariantKey;
+use crate::model::{GameExportOptions, LichessVariantKey};
 
 /// Accessor for the Bulk Pairing API.
 #[derive(Debug)]
@@ -61,12 +61,61 @@ impl<'a> BulkPairingApi<'a> {
         http::ok(self.client.request(Method::DELETE, Host::Default, &path)).await
     }
 
-    /// Streams the games of a bulk pairing as NDJSON.
+    /// Starts an export of a bulk pairing's games.
     /// `GET /api/bulk-pairing/{id}/games`
-    pub async fn games(&self, id: &str) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/bulk-pairing/{}/games", http::segment(id));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+    ///
+    /// Finish with [`stream`](BulkGamesRequest::stream) or
+    /// [`pgn`](BulkGamesRequest::pgn).
+    #[must_use]
+    pub fn games(&self, id: &'a str) -> BulkGamesRequest<'a> {
+        BulkGamesRequest::new(self.client, id)
+    }
+}
+
+/// Builder for exporting a bulk pairing's games
+/// (`GET /api/bulk-pairing/{id}/games`).
+#[derive(Debug)]
+pub struct BulkGamesRequest<'a> {
+    client: &'a LichessClient,
+    id: &'a str,
+    export: GameExportOptions,
+}
+
+impl<'a> BulkGamesRequest<'a> {
+    /// Creates the request builder.
+    pub(crate) fn new(client: &'a LichessClient, id: &'a str) -> Self {
+        Self {
+            client,
+            id,
+            export: GameExportOptions::default(),
+        }
+    }
+
+    /// Sets the shared export-format options (moves, clocks, evals, …).
+    #[must_use]
+    pub fn export(mut self, options: GameExportOptions) -> Self {
+        self.export = options;
+        self
+    }
+
+    /// Executes the export, streaming games as decoded JSON values.
+    pub async fn stream(self) -> Result<BoxStream<'static, Result<LichessGame>>> {
+        let request = self.request(http::ACCEPT_NDJSON);
         http::stream(request, self.client.max_line_bytes()).await
+    }
+
+    /// Executes the export, returning all games as one PGN string.
+    pub async fn pgn(self) -> Result<String> {
+        http::text(self.request(http::ACCEPT_PGN)).await
+    }
+
+    /// Builds the request with the given `Accept` representation.
+    fn request(&self, accept: &'static str) -> http::ApiRequest {
+        let path = format!("/api/bulk-pairing/{}/games", http::segment(self.id));
+        self.client
+            .request(Method::GET, Host::Default, &path)
+            .header(reqwest::header::ACCEPT, accept)
+            .query(&self.export)
     }
 }
 
