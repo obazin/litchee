@@ -2,6 +2,7 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
+use litchee::api::tournaments::swiss::SwissConditions;
 use litchee::error::{ApiErrorKind, LichessError};
 use litchee::model::GameExportOptions;
 use wiremock::matchers::{
@@ -53,6 +54,36 @@ async fn create_posts_to_team_path_with_clock() {
         .unwrap();
 
     assert_eq!(swiss.id, "new1");
+}
+
+#[tokio::test]
+async fn create_posts_conditions_and_extra_fields() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/swiss/new/coders"))
+        .and(body_string_contains("password=secret"))
+        .and(body_string_contains("forbiddenPairings="))
+        .and(body_string_contains("conditions.minRating.rating=1500"))
+        .and(body_string_contains("conditions.playYourGames=true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"new2"}"#))
+        .mount(&server)
+        .await;
+
+    let swiss = client(&server)
+        .swiss()
+        .create("coders", 300, 0, 7)
+        .password("secret")
+        .forbidden_pairings("alice bob")
+        .conditions(
+            SwissConditions::default()
+                .min_rating(1500)
+                .play_your_games(true),
+        )
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(swiss.id, "new2");
 }
 
 #[tokio::test]
