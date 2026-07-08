@@ -25,11 +25,17 @@ async fn official_streams_broadcasts() {
     );
     Mock::given(method("GET"))
         .and(path("/api/broadcast"))
+        .and(query_param("nb", "20"))
+        .and(query_param("live", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
-    let stream = client(&server).broadcasts().official().await.unwrap();
+    let stream = client(&server)
+        .broadcasts()
+        .official(Some(20), None, Some(true))
+        .await
+        .unwrap();
     let broadcasts: Vec<_> = stream.collect().await;
 
     assert_eq!(broadcasts.len(), 2);
@@ -101,10 +107,15 @@ async fn top_returns_active_and_upcoming() {
     let body = r#"{"active":[{"tour":{"id":"a","name":"A"},"rounds":[]}],"upcoming":[],"past":{}}"#;
     Mock::given(method("GET"))
         .and(path("/api/broadcast/top"))
+        .and(query_param("page", "1"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
-    let top = client(&server).broadcasts().top().await.unwrap();
+    let top = client(&server)
+        .broadcasts()
+        .top(Some(1), None)
+        .await
+        .unwrap();
     assert_eq!(top.active[0].tour.id, "a");
 }
 
@@ -193,13 +204,14 @@ async fn by_user_streams_broadcasts() {
     );
     Mock::given(method("GET"))
         .and(path("/api/broadcast/by/thibault"))
+        .and(query_param("page", "2"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
     let stream = client(&server)
         .broadcasts()
-        .by_user("thibault")
+        .by_user("thibault", Some(2), None)
         .await
         .unwrap();
     let broadcasts: Vec<_> = stream.collect().await;
@@ -219,11 +231,16 @@ async fn my_rounds_streams_rounds() {
     );
     Mock::given(method("GET"))
         .and(path("/api/broadcast/my-rounds"))
+        .and(query_param("nb", "5"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
-    let stream = client(&server).broadcasts().my_rounds().await.unwrap();
+    let stream = client(&server)
+        .broadcasts()
+        .my_rounds(Some(5))
+        .await
+        .unwrap();
     let rounds: Vec<_> = stream.collect().await;
 
     assert_eq!(rounds.len(), 2);
