@@ -4,7 +4,6 @@
 
 use futures_util::stream::BoxStream;
 use reqwest::Method;
-use reqwest::header::ACCEPT;
 use serde::{Deserialize, Serialize};
 
 use crate::api::gameplay::games::LichessGame;
@@ -12,10 +11,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
-use crate::model::{LichessColor, LichessLightUser};
-
-/// The `application/x-ndjson` content type.
-const NDJSON: &str = "application/x-ndjson";
+use crate::model::{GameExportOptions, LichessColor, LichessLightUser};
 
 /// Accessor for the TV API.
 #[derive(Debug)]
@@ -55,27 +51,76 @@ impl<'a> TvApi<'a> {
         self.feed_at(&path).await
     }
 
-    /// Streams the best ongoing games of a channel as NDJSON.
+    /// Starts an export of the best ongoing games of a channel.
     ///
-    /// `GET /api/tv/{channel}`
-    pub async fn channel_games(
-        &self,
-        channel: &str,
-        nb: u32,
-    ) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/tv/{}", http::segment(channel));
-        let request = self
-            .client
-            .request(Method::GET, Host::Default, &path)
-            .header(ACCEPT, NDJSON)
-            .query(&[("nb", nb)]);
-        http::stream(request, self.client.max_line_bytes()).await
+    /// Finish with [`stream`](TvChannelGamesRequest::stream) or
+    /// [`pgn`](TvChannelGamesRequest::pgn). `GET /api/tv/{channel}`
+    #[must_use]
+    pub fn channel_games(&self, channel: &'a str) -> TvChannelGamesRequest<'a> {
+        TvChannelGamesRequest::new(self.client, channel)
     }
 
     /// Opens a TV feed stream at the given path.
     async fn feed_at(&self, path: &str) -> Result<BoxStream<'static, Result<LichessTvFeedEvent>>> {
         let request = self.client.request(Method::GET, Host::Default, path);
         http::stream(request, self.client.max_line_bytes()).await
+    }
+}
+
+/// Builder for exporting a TV channel's best ongoing games
+/// (`GET /api/tv/{channel}`).
+#[derive(Debug)]
+pub struct TvChannelGamesRequest<'a> {
+    client: &'a LichessClient,
+    channel: &'a str,
+    nb: Option<u32>,
+    export: GameExportOptions,
+}
+
+impl<'a> TvChannelGamesRequest<'a> {
+    /// Creates the request builder.
+    pub(crate) fn new(client: &'a LichessClient, channel: &'a str) -> Self {
+        Self {
+            client,
+            channel,
+            nb: None,
+            export: GameExportOptions::default(),
+        }
+    }
+
+    /// Number of games to return (1–30).
+    #[must_use]
+    pub fn nb(mut self, nb: u32) -> Self {
+        self.nb = Some(nb);
+        self
+    }
+
+    /// Sets the shared export-format options (moves, clocks, opening, …).
+    #[must_use]
+    pub fn export(mut self, options: GameExportOptions) -> Self {
+        self.export = options;
+        self
+    }
+
+    /// Executes the export, streaming games as decoded JSON values.
+    pub async fn stream(self) -> Result<BoxStream<'static, Result<LichessGame>>> {
+        let request = self.request(http::ACCEPT_NDJSON);
+        http::stream(request, self.client.max_line_bytes()).await
+    }
+
+    /// Executes the export, returning all games as one PGN string.
+    pub async fn pgn(self) -> Result<String> {
+        http::text(self.request(http::ACCEPT_PGN)).await
+    }
+
+    /// Builds the request with the given `Accept` representation.
+    fn request(&self, accept: &'static str) -> http::ApiRequest {
+        let path = format!("/api/tv/{}", http::segment(self.channel));
+        self.client
+            .request(Method::GET, Host::Default, &path)
+            .header(reqwest::header::ACCEPT, accept)
+            .query(&[("nb", self.nb)])
+            .query(&self.export)
     }
 }
 
