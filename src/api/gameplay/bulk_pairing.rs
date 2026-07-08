@@ -120,7 +120,7 @@ impl<'a> BulkGamesRequest<'a> {
 }
 
 /// Form body for creating a bulk pairing.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 struct BulkPairingForm<'a> {
     players: &'a str,
     #[serde(rename = "clock.limit", skip_serializing_if = "Option::is_none")]
@@ -135,6 +135,14 @@ struct BulkPairingForm<'a> {
     rated: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     variant: Option<LichessVariantKey>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    days: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fen: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rules: Option<&'a str>,
 }
 
 /// Builder for creating a bulk pairing.
@@ -151,12 +159,7 @@ impl<'a> BulkPairingRequest<'a> {
             client,
             form: BulkPairingForm {
                 players,
-                clock_limit: None,
-                clock_increment: None,
-                pair_at: None,
-                start_clocks_at: None,
-                rated: None,
-                variant: None,
+                ..Default::default()
             },
         }
     }
@@ -194,6 +197,34 @@ impl<'a> BulkPairingRequest<'a> {
     #[must_use]
     pub fn variant(mut self, variant: LichessVariantKey) -> Self {
         self.form.variant = Some(variant);
+        self
+    }
+
+    /// Sets days per turn for correspondence pairings.
+    #[must_use]
+    pub fn days(mut self, days: u32) -> Self {
+        self.form.days = Some(days);
+        self
+    }
+
+    /// Sets a custom starting position (FEN) for all games.
+    #[must_use]
+    pub fn fen(mut self, fen: &'a str) -> Self {
+        self.form.fen = Some(fen);
+        self
+    }
+
+    /// Sets a message sent to all players when their game starts.
+    #[must_use]
+    pub fn message(mut self, message: &'a str) -> Self {
+        self.form.message = Some(message);
+        self
+    }
+
+    /// Sets extra game rules (comma-separated).
+    #[must_use]
+    pub fn rules(mut self, rules: &'a str) -> Self {
+        self.form.rules = Some(rules);
         self
     }
 

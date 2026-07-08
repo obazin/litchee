@@ -115,6 +115,8 @@ async fn create_posts_players_and_clock() {
         .and(path("/api/bulk-pairing"))
         .and(body_string_contains("players=t1%3At2"))
         .and(body_string_contains("clock.limit=300"))
+        .and(body_string_contains("message=Have+fun"))
+        .and(body_string_contains("rules=noRematch"))
         .respond_with(ResponseTemplate::new(200).set_body_string(PAIRING))
         .mount(&server)
         .await;
@@ -124,6 +126,8 @@ async fn create_posts_players_and_clock() {
         .create("t1:t2")
         .clock(300, 0)
         .rated(false)
+        .message("Have fun")
+        .rules("noRematch")
         .send()
         .await
         .unwrap();
