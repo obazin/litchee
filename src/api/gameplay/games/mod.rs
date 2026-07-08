@@ -13,7 +13,10 @@ mod export;
 mod model;
 mod stream;
 
-pub use export::{GameExportRequest, UserGamesRequest};
+pub use export::{
+    CurrentGameRequest, ExportBookmarksRequest, ExportByIdsRequest, GameExportRequest, GameSort,
+    UserGamesRequest,
+};
 pub use model::{
     LichessGame, LichessGameArenaTour, LichessGameChatMessage, LichessGameClock,
     LichessGameDivision, LichessGameMoveAnalysis, LichessGameMoveUpdate, LichessGameOpening,
@@ -27,6 +30,10 @@ const NDJSON: &str = "application/x-ndjson";
 
 /// The `application/x-chess-pgn` content type.
 const PGN: &str = "application/x-chess-pgn";
+
+/// The `application/json` content type. The single-game and current-game
+/// exports default to PGN, so JSON must be requested explicitly.
+const JSON: &str = "application/json";
 
 /// Accessor for the Games API.
 #[derive(Debug)]
@@ -58,13 +65,31 @@ impl<'a> GamesApi<'a> {
         UserGamesRequest::new(self.client, username)
     }
 
-    /// Gets the game the user is currently playing, if any.
+    /// Starts an export of the game a user is currently playing, if any.
     ///
-    /// `GET /api/user/{username}/current-game`
-    pub async fn current_game(&self, username: &str) -> Result<LichessGame> {
-        let path = format!("/api/user/{}/current-game", http::segment(username));
-        let request = self.client.request(Method::GET, Host::Default, &path);
-        http::json(request, "LichessGame").await
+    /// Finish with [`json`](CurrentGameRequest::json) or
+    /// [`pgn`](CurrentGameRequest::pgn). `GET /api/user/{username}/current-game`
+    #[must_use]
+    pub fn current_game(&self, username: &'a str) -> CurrentGameRequest<'a> {
+        CurrentGameRequest::new(self.client, username)
+    }
+
+    /// Starts an export of several games by id. `POST /api/games/export/_ids`
+    ///
+    /// Finish with [`stream`](ExportByIdsRequest::stream) or
+    /// [`pgn`](ExportByIdsRequest::pgn).
+    #[must_use]
+    pub fn export_by_ids(&self, ids: &[&str]) -> ExportByIdsRequest<'a> {
+        ExportByIdsRequest::new(self.client, ids)
+    }
+
+    /// Starts an export of the authenticated user's bookmarked games.
+    ///
+    /// Finish with [`stream`](ExportBookmarksRequest::stream) or
+    /// [`pgn`](ExportBookmarksRequest::pgn). `GET /api/games/export/bookmarks`
+    #[must_use]
+    pub fn export_bookmarks(&self) -> ExportBookmarksRequest<'a> {
+        ExportBookmarksRequest::new(self.client)
     }
 
     /// Imports a game from its PGN.

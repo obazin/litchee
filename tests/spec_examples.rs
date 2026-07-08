@@ -71,6 +71,7 @@ async fn game_decodes_spec_example() {
     let game = client(&server)
         .games()
         .current_game("anyone")
+        .json()
         .await
         .unwrap();
     assert!(!game.id.is_empty());
