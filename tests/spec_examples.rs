@@ -7,6 +7,7 @@
 //! Lichess-authored payloads rather than hand-written minimal mocks.
 
 use litchee::LichessClient;
+use litchee::api::users::players::UserQuery;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -53,7 +54,11 @@ async fn user_public_data_decodes_spec_example() {
         include_str!("fixtures/user_public.json"),
     )
     .await;
-    let user = client(&server).users().get("anyone").await.unwrap();
+    let user = client(&server)
+        .users()
+        .get("anyone", &UserQuery::default())
+        .await
+        .unwrap();
     assert!(!user.user.id.is_empty());
     assert!(!user.user.username.is_empty());
     assert!(user.user.perfs.is_some(), "perfs should decode");

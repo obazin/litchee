@@ -96,11 +96,14 @@ impl<'a> AccountApi<'a> {
 
     /// Gets the authenticated user's timeline.
     ///
-    /// `GET /api/timeline`
-    pub async fn timeline(&self) -> Result<LichessTimeline> {
+    /// `since` returns only entries after this timestamp (ms); `nb` limits the
+    /// number of entries. `GET /api/timeline`
+    pub async fn timeline(&self, since: Option<i64>, nb: Option<u32>) -> Result<LichessTimeline> {
         let request = self
             .client
-            .request(Method::GET, Host::Default, "/api/timeline");
+            .request(Method::GET, Host::Default, "/api/timeline")
+            .query(&[("since", since)])
+            .query(&[("nb", nb)]);
         http::json(request, "LichessTimeline").await
     }
 }

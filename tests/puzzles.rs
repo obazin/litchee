@@ -79,11 +79,16 @@ async fn activity_streams_rounds() {
     Mock::given(method("GET"))
         .and(path("/api/puzzle/activity"))
         .and(query_param("max", "2"))
+        .and(query_param("since", "1700000000000"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
-    let stream = client(&server).puzzles().activity(Some(2)).await.unwrap();
+    let stream = client(&server)
+        .puzzles()
+        .activity(Some(2), None, Some(1_700_000_000_000))
+        .await
+        .unwrap();
     let rounds: Vec<_> = stream.collect().await;
 
     assert_eq!(rounds.len(), 2);
@@ -97,10 +102,16 @@ async fn batch_returns_puzzles() {
     Mock::given(method("GET"))
         .and(path("/api/puzzle/batch/mix"))
         .and(query_param("nb", "5"))
+        .and(query_param("difficulty", "hardest"))
+        .and(query_param("color", "white"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
-    let batch = client(&server).puzzles().batch("mix", 5).await.unwrap();
+    let batch = client(&server)
+        .puzzles()
+        .batch("mix", 5, Some("hardest"), Some("white"))
+        .await
+        .unwrap();
     assert_eq!(batch.puzzles.len(), 1);
 }
 
@@ -180,6 +191,7 @@ async fn storm_dashboard_returns_scores() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/api/storm/dashboard/maia"))
+        .and(query_param("days", "30"))
         .respond_with(
             ResponseTemplate::new(200).set_body_string(r#"{"high":{"allTime":50},"days":[]}"#),
         )
@@ -188,7 +200,7 @@ async fn storm_dashboard_returns_scores() {
 
     let dash = client(&server)
         .puzzles()
-        .storm_dashboard("maia")
+        .storm_dashboard("maia", Some(30))
         .await
         .unwrap();
 

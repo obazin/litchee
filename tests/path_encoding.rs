@@ -2,6 +2,7 @@
 //! so a value containing `/`, `?`, or `#` cannot reshape the request path.
 
 use litchee::LichessClient;
+use litchee::api::users::players::UserQuery;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -24,7 +25,10 @@ async fn slash_in_username_is_encoded_not_treated_as_separator() {
         .mount(&server)
         .await;
 
-    let user = client(&server).users().get("a/b").await;
+    let user = client(&server)
+        .users()
+        .get("a/b", &UserQuery::default())
+        .await;
 
     assert!(user.is_ok(), "encoded path should match the mounted route");
 }
@@ -39,7 +43,10 @@ async fn query_and_fragment_characters_in_segment_are_encoded() {
         .mount(&server)
         .await;
 
-    let user = client(&server).users().get("a?b#c").await;
+    let user = client(&server)
+        .users()
+        .get("a?b#c", &UserQuery::default())
+        .await;
 
     assert!(user.is_ok(), "`?`/`#` must not split off a query/fragment");
 }

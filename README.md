@@ -144,7 +144,7 @@ use litchee::LichessClient;
 let client = LichessClient::builder().token("lip_your_token").build()?;
 
 // Stream the authenticated user's puzzle history (needs the `puzzle:read` scope).
-let mut activity = client.puzzles().activity(Some(50)).await?;
+let mut activity = client.puzzles().activity(Some(50), None, None).await?;
 while let Some(round) = activity.next().await {
     let round = round?;
     let outcome = if round.win { "solved" } else { "failed" };

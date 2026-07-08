@@ -29,19 +29,32 @@ impl<'a> UsersApi<'a> {
     /// Gets the extended profile of a single user.
     ///
     /// `GET /api/user/{username}`
-    pub async fn get(&self, username: &str) -> Result<LichessUserExtended> {
+    ///
+    /// `query` toggles the optional extra sections (trophies, full profile,
+    /// leaderboard rank, FIDE id); [`UserQuery::default`] requests none.
+    pub async fn get(&self, username: &str, query: &UserQuery) -> Result<LichessUserExtended> {
         let path = format!("/api/user/{}", http::segment(username));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(query);
         http::json(request, "LichessUserExtended").await
     }
 
     /// Gets several users by id (up to 300), returned in the requested order.
     ///
+    /// `profile`/`rank` include each user's full profile / leaderboard rank.
     /// `POST /api/users`
-    pub async fn get_many(&self, ids: &[&str]) -> Result<Vec<LichessUser>> {
+    pub async fn get_many(
+        &self,
+        ids: &[&str],
+        profile: Option<bool>,
+        rank: Option<bool>,
+    ) -> Result<Vec<LichessUser>> {
         let request = self
             .client
             .request(Method::POST, Host::Default, "/api/users")
+            .query(&[("profile", profile), ("rank", rank)])
             .header(CONTENT_TYPE, "text/plain")
             .body(ids.join(","));
         http::json(request, "Vec<LichessUser>").await
@@ -49,12 +62,24 @@ impl<'a> UsersApi<'a> {
 
     /// Gets the real-time online/playing/streaming status of several users.
     ///
-    /// `GET /api/users/status`
-    pub async fn statuses(&self, ids: &[&str]) -> Result<Vec<LichessUserStatus>> {
+    /// The `with_*` flags add signal strength, current game ids, and game
+    /// metadata. `GET /api/users/status`
+    pub async fn statuses(
+        &self,
+        ids: &[&str],
+        with_signal: Option<bool>,
+        with_game_ids: Option<bool>,
+        with_game_metas: Option<bool>,
+    ) -> Result<Vec<LichessUserStatus>> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/users/status")
-            .query(&[("ids", ids.join(","))]);
+            .query(&[("ids", ids.join(","))])
+            .query(&[
+                ("withSignal", with_signal),
+                ("withGameIds", with_game_ids),
+                ("withGameMetas", with_game_metas),
+            ]);
         http::json(request, "Vec<LichessUserStatus>").await
     }
 
@@ -82,13 +107,11 @@ impl<'a> UsersApi<'a> {
 
     /// Autocompletes usernames from a prefix (at least 3 characters).
     ///
-    /// `GET /api/player/autocomplete`
-    pub async fn autocomplete(&self, term: &str) -> Result<Vec<String>> {
-        let request = self
-            .client
-            .request(Method::GET, Host::Default, "/api/player/autocomplete")
-            .query(&[("term", term)]);
-        http::json(request, "Vec<String>").await
+    /// Returns a builder; refine it with the optional filters and finish with
+    /// [`AutocompleteRequest::send`]. `GET /api/player/autocomplete`
+    #[must_use]
+    pub fn autocomplete(&self, term: &'a str) -> AutocompleteRequest<'a> {
+        AutocompleteRequest::new(self.client, term)
     }
 
     /// Gets a user's rating history across all perfs.
@@ -168,6 +191,142 @@ impl<'a> UsersApi<'a> {
     }
 }
 
+/// Optional extra sections to include in a [`UsersApi::get`] lookup.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct UserQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trophies: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    profile: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rank: Option<bool>,
+    #[serde(rename = "fideId", skip_serializing_if = "Option::is_none")]
+    fide_id: Option<bool>,
+}
+
+impl UserQuery {
+    /// Include the user's trophies.
+    #[must_use]
+    pub fn trophies(mut self, include: bool) -> Self {
+        self.trophies = Some(include);
+        self
+    }
+
+    /// Include the user's full profile.
+    #[must_use]
+    pub fn profile(mut self, include: bool) -> Self {
+        self.profile = Some(include);
+        self
+    }
+
+    /// Include the user's leaderboard rank.
+    #[must_use]
+    pub fn rank(mut self, include: bool) -> Self {
+        self.rank = Some(include);
+        self
+    }
+
+    /// Include the user's FIDE id.
+    #[must_use]
+    pub fn fide_id(mut self, include: bool) -> Self {
+        self.fide_id = Some(include);
+        self
+    }
+}
+
+/// Query parameters for the username autocomplete.
+#[derive(Debug, Default, Serialize)]
+struct AutocompleteQuery<'a> {
+    term: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    names: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    friend: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    team: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tour: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    swiss: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    teacher: Option<bool>,
+}
+
+/// Builder for the username autocomplete (`GET /api/player/autocomplete`).
+///
+/// Always returns the array-of-usernames form; the spec's `object=true` and
+/// `exists=true` modes (which change the response shape to an object and a bare
+/// boolean respectively) are not modeled.
+#[derive(Debug)]
+pub struct AutocompleteRequest<'a> {
+    client: &'a LichessClient,
+    query: AutocompleteQuery<'a>,
+}
+
+impl<'a> AutocompleteRequest<'a> {
+    /// Creates the request builder for the search `term`.
+    pub(crate) fn new(client: &'a LichessClient, term: &'a str) -> Self {
+        Self {
+            client,
+            query: AutocompleteQuery {
+                term,
+                ..Default::default()
+            },
+        }
+    }
+
+    /// Return usernames with their preferred casing.
+    #[must_use]
+    pub fn names(mut self, value: bool) -> Self {
+        self.query.names = Some(value);
+        self
+    }
+
+    /// Prefer followed players (requires OAuth).
+    #[must_use]
+    pub fn friend(mut self, value: bool) -> Self {
+        self.query.friend = Some(value);
+        self
+    }
+
+    /// Restrict the search to a team (id/slug).
+    #[must_use]
+    pub fn team(mut self, team_id: &'a str) -> Self {
+        self.query.team = Some(team_id);
+        self
+    }
+
+    /// Restrict the search to an arena tournament (id).
+    #[must_use]
+    pub fn tour(mut self, tour_id: &'a str) -> Self {
+        self.query.tour = Some(tour_id);
+        self
+    }
+
+    /// Restrict the search to a swiss tournament (id).
+    #[must_use]
+    pub fn swiss(mut self, swiss_id: &'a str) -> Self {
+        self.query.swiss = Some(swiss_id);
+        self
+    }
+
+    /// Only return players who also have a teacher role.
+    #[must_use]
+    pub fn teacher(mut self, value: bool) -> Self {
+        self.query.teacher = Some(value);
+        self
+    }
+
+    /// Executes the autocomplete, returning matching usernames.
+    pub async fn send(self) -> Result<Vec<String>> {
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, "/api/player/autocomplete")
+            .query(&self.query);
+        http::json(request, "Vec<String>").await
+    }
+}
+
 impl LichessClient {
     /// Users API: look up players, their status, and head-to-head records.
     #[must_use]
@@ -242,6 +401,31 @@ pub struct LichessMatchup {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn user_query_serializes_toggles() {
+        assert_eq!(
+            serde_urlencoded::to_string(UserQuery::default().trophies(true).fide_id(false))
+                .unwrap(),
+            "trophies=true&fideId=false"
+        );
+        assert_eq!(
+            serde_urlencoded::to_string(UserQuery::default()).unwrap(),
+            ""
+        );
+    }
+
+    #[test]
+    fn autocomplete_query_serializes_filters() {
+        let query = AutocompleteQuery {
+            term: "bob",
+            names: Some(true),
+            team: Some("coders"),
+            ..Default::default()
+        };
+        let encoded = serde_urlencoded::to_string(&query).unwrap();
+        assert_eq!(encoded, "term=bob&names=true&team=coders");
+    }
 
     #[test]
     fn parses_user_status_flags() {

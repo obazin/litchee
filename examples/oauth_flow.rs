@@ -245,7 +245,7 @@ async fn show_recent_games(client: &LichessClient, username: &str) -> Result<(),
 /// Prints the 10 most recent puzzle attempts (requires `puzzle:read`).
 async fn show_recent_puzzles(client: &LichessClient) -> Result<(), Box<dyn Error>> {
     println!("── 10 most recent puzzle attempts ──");
-    let mut activity = client.puzzles().activity(Some(10)).await?;
+    let mut activity = client.puzzles().activity(Some(10), None, None).await?;
     let mut count = 0;
     while let Some(entry) = activity.next().await {
         let entry = entry?;
