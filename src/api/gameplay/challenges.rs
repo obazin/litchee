@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use futures_util::stream::BoxStream;
 use reqwest::Method;
+use reqwest::header::ACCEPT;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -248,7 +249,7 @@ impl<'a> ChallengeRequest<'a> {
     /// until the challenge is accepted, declined, or canceled.
     pub async fn stream(mut self) -> Result<BoxStream<'static, Result<Value>>> {
         self.form.keep_alive_stream = Some(true);
-        let request = self.request();
+        let request = self.request().header(ACCEPT, http::ACCEPT_NDJSON);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
