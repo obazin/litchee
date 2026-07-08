@@ -25,16 +25,6 @@ pub use model::{
     LichessNowPlayingOpponent, LichessPlayerAnalysis,
 };
 
-/// The `application/x-ndjson` content type.
-const NDJSON: &str = "application/x-ndjson";
-
-/// The `application/x-chess-pgn` content type.
-const PGN: &str = "application/x-chess-pgn";
-
-/// The `application/json` content type. The single-game and current-game
-/// exports default to PGN, so JSON must be requested explicitly.
-const JSON: &str = "application/json";
-
 /// Accessor for the Games API.
 #[derive(Debug)]
 pub struct GamesApi<'a> {
