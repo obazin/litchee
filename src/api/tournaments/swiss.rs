@@ -11,7 +11,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::{ApiErrorKind, LichessError, Result};
 use crate::http;
-use crate::model::LichessTitle;
+use crate::model::{GameExportOptions, LichessTitle};
 
 /// Reclassifies a `401` from a Swiss edit/schedule request as the distinct
 /// [`ApiErrorKind::SwissUnauthorizedEdit`] ownership rejection — the spec's
@@ -138,14 +138,13 @@ impl<'a> SwissApi<'a> {
         http::stream(request, self.client.max_line_bytes()).await
     }
 
-    /// Streams a swiss tournament's games as NDJSON. `GET /api/swiss/{id}/games`
-    pub async fn games(&self, id: &str) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/swiss/{}/games", http::segment(id));
-        let request = self
-            .client
-            .request(Method::GET, Host::Default, &path)
-            .header(reqwest::header::ACCEPT, "application/x-ndjson");
-        http::stream(request, self.client.max_line_bytes()).await
+    /// Starts an export of a swiss tournament's games. `GET /api/swiss/{id}/games`
+    ///
+    /// Finish with [`stream`](SwissGamesRequest::stream) or
+    /// [`pgn`](SwissGamesRequest::pgn).
+    #[must_use]
+    pub fn games(&self, id: &'a str) -> SwissGamesRequest<'a> {
+        SwissGamesRequest::new(self.client, id)
     }
 
     /// Issues a no-argument `POST` action on a swiss tournament.
@@ -229,6 +228,63 @@ impl<'a> CreateSwissRequest<'a> {
         } else {
             result
         }
+    }
+}
+
+/// Builder for exporting a swiss tournament's games
+/// (`GET /api/swiss/{id}/games`).
+#[derive(Debug)]
+pub struct SwissGamesRequest<'a> {
+    client: &'a LichessClient,
+    id: &'a str,
+    player: Option<&'a str>,
+    export: GameExportOptions,
+}
+
+impl<'a> SwissGamesRequest<'a> {
+    /// Creates the request builder.
+    pub(crate) fn new(client: &'a LichessClient, id: &'a str) -> Self {
+        Self {
+            client,
+            id,
+            player: None,
+            export: GameExportOptions::default(),
+        }
+    }
+
+    /// Only games featuring this player.
+    #[must_use]
+    pub fn player(mut self, player: &'a str) -> Self {
+        self.player = Some(player);
+        self
+    }
+
+    /// Sets the shared export-format options (moves, clocks, evals, …).
+    #[must_use]
+    pub fn export(mut self, options: GameExportOptions) -> Self {
+        self.export = options;
+        self
+    }
+
+    /// Executes the export, streaming games as decoded JSON values.
+    pub async fn stream(self) -> Result<BoxStream<'static, Result<LichessGame>>> {
+        let request = self.request(http::ACCEPT_NDJSON);
+        http::stream(request, self.client.max_line_bytes()).await
+    }
+
+    /// Executes the export, returning all games as one PGN string.
+    pub async fn pgn(self) -> Result<String> {
+        http::text(self.request(http::ACCEPT_PGN)).await
+    }
+
+    /// Builds the request with the given `Accept` representation.
+    fn request(&self, accept: &'static str) -> http::ApiRequest {
+        let path = format!("/api/swiss/{}/games", http::segment(self.id));
+        self.client
+            .request(Method::GET, Host::Default, &path)
+            .header(reqwest::header::ACCEPT, accept)
+            .query(&[("player", self.player)])
+            .query(&self.export)
     }
 }
 
