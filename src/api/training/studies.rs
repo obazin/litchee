@@ -10,6 +10,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
+use crate::model::PgnExportOptions;
 
 /// Form body for importing PGN into a study.
 #[derive(Debug, Serialize)]
@@ -35,19 +36,36 @@ impl<'a> StudiesApi<'a> {
     }
 
     /// Exports one chapter as PGN. `GET /api/study/{studyId}/{chapterId}.pgn`
-    pub async fn export_chapter_pgn(&self, study_id: &str, chapter_id: &str) -> Result<String> {
+    pub async fn export_chapter_pgn(
+        &self,
+        study_id: &str,
+        chapter_id: &str,
+        options: &PgnExportOptions,
+    ) -> Result<String> {
         let path = format!(
             "/api/study/{}/{}.pgn",
             http::segment(study_id),
             http::segment(chapter_id)
         );
-        http::text(self.client.request(Method::GET, Host::Default, &path)).await
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(options);
+        http::text(request).await
     }
 
     /// Exports all chapters of a study as PGN. `GET /api/study/{studyId}.pgn`
-    pub async fn export_study_pgn(&self, study_id: &str) -> Result<String> {
+    pub async fn export_study_pgn(
+        &self,
+        study_id: &str,
+        options: &PgnExportOptions,
+    ) -> Result<String> {
         let path = format!("/api/study/{}.pgn", http::segment(study_id));
-        http::text(self.client.request(Method::GET, Host::Default, &path)).await
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(options);
+        http::text(request).await
     }
 
     /// Reads a study's metadata headers without the body, for cheap
@@ -61,9 +79,17 @@ impl<'a> StudiesApi<'a> {
 
     /// Exports all of a user's studies as PGN.
     /// `GET /api/study/by/{username}/export.pgn`
-    pub async fn export_all_pgn(&self, username: &str) -> Result<String> {
+    pub async fn export_all_pgn(
+        &self,
+        username: &str,
+        options: &PgnExportOptions,
+    ) -> Result<String> {
         let path = format!("/api/study/by/{}/export.pgn", http::segment(username));
-        http::text(self.client.request(Method::GET, Host::Default, &path)).await
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(options);
+        http::text(request).await
     }
 
     /// Streams metadata for a user's studies. `GET /api/study/by/{username}`

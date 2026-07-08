@@ -14,6 +14,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
+use crate::model::PgnExportOptions;
 
 /// Accessor for the Broadcasts API.
 #[derive(Debug)]
@@ -98,37 +99,65 @@ impl<'a> BroadcastsApi<'a> {
     }
 
     /// Exports a round as PGN. `GET /api/broadcast/round/{roundId}.pgn`
-    pub async fn round_pgn(&self, round_id: &str) -> Result<String> {
+    pub async fn round_pgn(&self, round_id: &str, options: &PgnExportOptions) -> Result<String> {
         let path = format!("/api/broadcast/round/{}.pgn", http::segment(round_id));
-        http::text(self.client.request(Method::GET, Host::Default, &path)).await
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(options);
+        http::text(request).await
     }
 
     /// Exports all rounds of a tournament as PGN.
     /// `GET /api/broadcast/{broadcastTournamentId}.pgn`
-    pub async fn all_rounds_pgn(&self, tournament_id: &str) -> Result<String> {
+    pub async fn all_rounds_pgn(
+        &self,
+        tournament_id: &str,
+        options: &PgnExportOptions,
+    ) -> Result<String> {
         let path = format!("/api/broadcast/{}.pgn", http::segment(tournament_id));
-        http::text(self.client.request(Method::GET, Host::Default, &path)).await
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(options);
+        http::text(request).await
     }
 
     /// Streams a round's PGN as games are updated (text; stays open while the
     /// round is live). `GET /api/stream/broadcast/round/{roundId}.pgn`
-    pub async fn stream_round_pgn(&self, round_id: &str) -> Result<String> {
+    pub async fn stream_round_pgn(
+        &self,
+        round_id: &str,
+        options: &PgnExportOptions,
+    ) -> Result<String> {
         let path = format!(
             "/api/stream/broadcast/round/{}.pgn",
             http::segment(round_id)
         );
-        http::text(self.client.request(Method::GET, Host::Default, &path)).await
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(options);
+        http::text(request).await
     }
 
     /// Streams the PGN of all ongoing rounds of a broadcast group as games are
     /// updated (text; stays open while rounds are live).
     /// `GET /api/stream/broadcast/group/{broadcastGroupId}.pgn`
-    pub async fn stream_group_pgn(&self, group_id: &str) -> Result<String> {
+    pub async fn stream_group_pgn(
+        &self,
+        group_id: &str,
+        options: &PgnExportOptions,
+    ) -> Result<String> {
         let path = format!(
             "/api/stream/broadcast/group/{}.pgn",
             http::segment(group_id)
         );
-        http::text(self.client.request(Method::GET, Host::Default, &path)).await
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(options);
+        http::text(request).await
     }
 
     /// Pushes PGN games to a round.

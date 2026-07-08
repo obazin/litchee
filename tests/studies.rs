@@ -2,7 +2,8 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
-use wiremock::matchers::{body_string_contains, method, path};
+use litchee::model::PgnExportOptions;
+use wiremock::matchers::{body_string_contains, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> LichessClient {
@@ -24,7 +25,7 @@ async fn export_study_pgn_returns_text() {
 
     let pgn = client(&server)
         .studies()
-        .export_study_pgn("WTvnkWAL")
+        .export_study_pgn("WTvnkWAL", &PgnExportOptions::default())
         .await
         .unwrap();
 
@@ -66,7 +67,7 @@ async fn export_chapter_pgn_returns_text() {
 
     let pgn = client(&server)
         .studies()
-        .export_chapter_pgn("WTvnkWAL", "ch1")
+        .export_chapter_pgn("WTvnkWAL", "ch1", &PgnExportOptions::default())
         .await
         .unwrap();
 
@@ -78,13 +79,20 @@ async fn export_all_pgn_returns_text() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/api/study/by/bobby/export.pgn"))
+        .and(query_param("variations", "false"))
+        .and(query_param("orientation", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"All\"]\n\n1. d4 *"))
         .mount(&server)
         .await;
 
     let pgn = client(&server)
         .studies()
-        .export_all_pgn("bobby")
+        .export_all_pgn(
+            "bobby",
+            &PgnExportOptions::default()
+                .variations(false)
+                .orientation(true),
+        )
         .await
         .unwrap();
 
