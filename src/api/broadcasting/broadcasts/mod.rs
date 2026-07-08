@@ -34,18 +34,32 @@ impl<'a> BroadcastsApi<'a> {
     }
 
     /// Streams official broadcasts. `GET /api/broadcast`
-    pub async fn official(&self) -> Result<BoxStream<'static, Result<LichessBroadcast>>> {
+    ///
+    /// `nb` limits the count; `html` embeds rendered descriptions; `live`
+    /// restricts to broadcasts with an ongoing round.
+    pub async fn official(
+        &self,
+        nb: Option<u32>,
+        html: Option<bool>,
+        live: Option<bool>,
+    ) -> Result<BoxStream<'static, Result<LichessBroadcast>>> {
         let request = self
             .client
-            .request(Method::GET, Host::Default, "/api/broadcast");
+            .request(Method::GET, Host::Default, "/api/broadcast")
+            .query(&[("nb", nb)])
+            .query(&[("html", html), ("live", live)]);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Gets the top broadcasts (active, upcoming, past). `GET /api/broadcast/top`
-    pub async fn top(&self) -> Result<LichessBroadcastTop> {
+    ///
+    /// `page` selects a page; `html` embeds rendered descriptions.
+    pub async fn top(&self, page: Option<u32>, html: Option<bool>) -> Result<LichessBroadcastTop> {
         let request = self
             .client
-            .request(Method::GET, Host::Default, "/api/broadcast/top");
+            .request(Method::GET, Host::Default, "/api/broadcast/top")
+            .query(&[("page", page)])
+            .query(&[("html", html)]);
         http::json(request, "LichessBroadcastTop").await
     }
 
@@ -59,21 +73,34 @@ impl<'a> BroadcastsApi<'a> {
     }
 
     /// Streams broadcasts created by a user. `GET /api/broadcast/by/{username}`
+    ///
+    /// `page` selects a page; `html` embeds rendered descriptions.
     pub async fn by_user(
         &self,
         username: &str,
+        page: Option<u32>,
+        html: Option<bool>,
     ) -> Result<BoxStream<'static, Result<LichessBroadcast>>> {
         let path = format!("/api/broadcast/by/{}", http::segment(username));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("page", page)])
+            .query(&[("html", html)]);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams the authenticated user's broadcast rounds.
-    /// `GET /api/broadcast/my-rounds`
-    pub async fn my_rounds(&self) -> Result<BoxStream<'static, Result<LichessBroadcastMyRound>>> {
+    ///
+    /// `nb` limits the number of rounds. `GET /api/broadcast/my-rounds`
+    pub async fn my_rounds(
+        &self,
+        nb: Option<u32>,
+    ) -> Result<BoxStream<'static, Result<LichessBroadcastMyRound>>> {
         let request = self
             .client
-            .request(Method::GET, Host::Default, "/api/broadcast/my-rounds");
+            .request(Method::GET, Host::Default, "/api/broadcast/my-rounds")
+            .query(&[("nb", nb)]);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
