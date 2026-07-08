@@ -2,7 +2,10 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
-use wiremock::matchers::{body_string_contains, header, method, path};
+use litchee::model::GameExportOptions;
+use wiremock::matchers::{
+    body_string_contains, header, method, path, query_param, query_param_is_missing,
+};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> LichessClient {
@@ -93,14 +96,53 @@ async fn games_streams_with_ndjson_accept() {
     Mock::given(method("GET"))
         .and(path("/api/tournament/abc/games"))
         .and(header("accept", "application/x-ndjson"))
+        .and(query_param_is_missing("player"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
-    let stream = client(&server).arena().games("abc").await.unwrap();
+    let stream = client(&server).arena().games("abc").stream().await.unwrap();
     let games: Vec<_> = stream.collect().await;
 
     assert_eq!(games.len(), 2);
+}
+
+#[tokio::test]
+async fn games_sends_player_and_export_params() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/tournament/abc/games"))
+        .and(query_param("player", "bobby"))
+        .and(query_param("clocks", "true"))
+        .and(query_param("opening", "true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{\"id\":\"g1\"}\n"))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server)
+        .arena()
+        .games("abc")
+        .player("bobby")
+        .export(GameExportOptions::default().clocks(true).opening(true))
+        .stream()
+        .await
+        .unwrap();
+    let games: Vec<_> = stream.collect().await;
+    assert_eq!(games.len(), 1);
+}
+
+#[tokio::test]
+async fn games_pgn_sets_accept_header() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/tournament/abc/games"))
+        .and(header("accept", "application/x-chess-pgn"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"x\"]\n\n1. e4 *"))
+        .mount(&server)
+        .await;
+
+    let pgn = client(&server).arena().games("abc").pgn().await.unwrap();
+    assert!(pgn.contains("1. e4"));
 }
 
 #[tokio::test]
