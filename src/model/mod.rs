@@ -5,11 +5,13 @@
 //! widely enough to warrant a common home.
 
 mod common;
+mod game_export;
 mod perf;
 mod title;
 mod user;
 
 pub use common::{LichessColor, LichessOk, LichessSpeed, LichessVariantKey};
+pub use game_export::GameExportOptions;
 pub use perf::{LichessPerf, LichessPerfs, LichessPuzzleModePerf};
 pub use title::LichessTitle;
 pub use user::{
