@@ -142,6 +142,10 @@ impl<'a> BroadcastsApi<'a> {
 
     /// Exports all rounds of a tournament as PGN.
     /// `GET /api/broadcast/{broadcastTournamentId}.pgn`
+    ///
+    /// For real-time updates about an ongoing tournament, prefer the round PGN
+    /// stream ([`Self::stream_round_pgn`]) or group PGN stream
+    /// ([`Self::stream_group_pgn`]) instead.
     pub async fn all_rounds_pgn(
         &self,
         tournament_id: &str,
