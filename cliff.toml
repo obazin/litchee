@@ -1,0 +1,74 @@
+# git-cliff configuration for litchee — https://git-cliff.org
+#
+# The changelog is generated from Conventional-Commit messages. Edit your commit
+# messages, not CHANGELOG.md. Group names below mirror litchee's release-note
+# house style (Features / Fixes / Breaking changes / Dependencies & spec).
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to **litchee** are documented in this file. It is generated
+from [Conventional Commits](https://www.conventionalcommits.org) by
+[git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+"""
+# One release section. `--strip all` reduces this to just the body, which is what
+# the `just release` recipe feeds to `gh release create`.
+body = """
+{% if version %}\
+## [{{ version }}](https://github.com/obazin/litchee/releases/tag/{{ version }}) — {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [unreleased]
+{% endif %}\
+{% if previous.version %}\
+
+Changes since [{{ previous.version }}](https://github.com/obazin/litchee/releases/tag/{{ previous.version }}).
+{% endif %}\
+{% set breaking = commits | filter(attribute="breaking", value=true) %}\
+{% if breaking | length > 0 %}
+
+### Breaking changes
+{% for commit in breaking %}\
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.breaking_description | default(value=commit.message) | upper_first | trim }}
+{% endfor %}\
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}\
+{% set rows = commits | filter(attribute="breaking", value=false) %}\
+{% if rows | length > 0 %}
+
+### {{ group | striptags | trim | upper_first }}
+{% for commit in rows %}\
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | upper_first | trim }}
+{% endfor %}\
+{% endif %}\
+{% endfor %}
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+# Drop merge/non-conventional commits (e.g. Dependabot merges) from the log.
+filter_unconventional = true
+filter_commits = false
+split_commits = false
+# Keep a `feat!:` / `BREAKING CHANGE:` commit even if its type would be skipped.
+protect_breaking_commits = true
+tag_pattern = "v[0-9].*"
+topo_order = false
+sort_commits = "newest"
+
+# First matching rule wins. `refacto` is litchee's house spelling of `refactor`.
+# The `<!-- N -->` prefixes force section order (Tera's `group_by` sorts keys
+# alphabetically); the body template strips them with `striptags`.
+commit_parsers = [
+  { message = "^feat",                group = "<!-- 0 -->Features" },
+  { message = "^fix",                 group = "<!-- 1 -->Fixes" },
+  { message = "^perf",                group = "<!-- 2 -->Performance" },
+  { message = "^(refacto|refactor)",  group = "<!-- 3 -->Refactor" },
+  { message = "^docs",                group = "<!-- 4 -->Documentation" },
+  { message = "^chore\\(release\\)",  skip = true },
+  { message = "^chore\\(deps\\)",     group = "<!-- 5 -->Dependencies & spec" },
+  { message = "^build\\(deps\\)",     group = "<!-- 5 -->Dependencies & spec" },
+  { message = "^(test|ci|style|build|chore)", skip = true },
+]

@@ -42,10 +42,13 @@ impl<'a> BotApi<'a> {
     /// Streams the currently-online bots.
     ///
     /// `GET /api/bot/online`
-    pub async fn online(&self) -> Result<BoxStream<'static, Result<LichessUser>>> {
+    ///
+    /// `nb` limits the number of bots returned (max 512).
+    pub async fn online(&self, nb: Option<u32>) -> Result<BoxStream<'static, Result<LichessUser>>> {
         let request = self
             .client
-            .request(Method::GET, Host::Default, "/api/bot/online");
+            .request(Method::GET, Host::Default, "/api/bot/online")
+            .query(&[("nb", nb)]);
         http::stream(request, self.client.max_line_bytes()).await
     }
 

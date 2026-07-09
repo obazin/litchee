@@ -41,6 +41,13 @@
             # native library with CMake; pkg-config is needed by some -sys deps.
             pkgs.cmake
             pkgs.pkg-config
+            # Release automation driven by `just` (see justfile):
+            # git-cliff generates the changelog, cargo-edit bumps the version,
+            # and gh publishes the GitHub release.
+            pkgs.just
+            pkgs.git-cliff
+            pkgs.cargo-edit
+            pkgs.gh
           ];
 
           # rust-analyzer resolves std sources through this path.

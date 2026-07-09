@@ -2,7 +2,11 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
-use wiremock::matchers::{body_string_contains, header, method, path};
+use litchee::api::tournaments::arena::ArenaConditions;
+use litchee::model::GameExportOptions;
+use wiremock::matchers::{
+    body_string_contains, header, method, path, query_param, query_param_is_missing,
+};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> LichessClient {
@@ -53,15 +57,54 @@ async fn create_posts_clock_and_name() {
 }
 
 #[tokio::test]
+async fn create_posts_conditions_and_extra_fields() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/tournament"))
+        .and(body_string_contains("berserkable=false"))
+        .and(body_string_contains("password=secret"))
+        .and(body_string_contains("teamBattleByTeam=coders"))
+        .and(body_string_contains("conditions.minRating.rating=1600"))
+        .and(body_string_contains("conditions.nbRatedGame.nb=20"))
+        .and(body_string_contains("conditions.bots=false"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"new2"}"#))
+        .mount(&server)
+        .await;
+
+    let arena = client(&server)
+        .arena()
+        .create("Team", 3.0, 0, 60)
+        .berserkable(false)
+        .password("secret")
+        .team_battle_by_team("coders")
+        .conditions(
+            ArenaConditions::default()
+                .min_rating(1600)
+                .nb_rated_games(20)
+                .bots(false),
+        )
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(arena.id, "new2");
+}
+
+#[tokio::test]
 async fn join_posts_to_the_join_path() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/api/tournament/abc/join"))
+        .and(body_string_contains("password=code"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
         .mount(&server)
         .await;
 
-    client(&server).arena().join("abc").await.unwrap();
+    client(&server)
+        .arena()
+        .join("abc", Some("code"), None, None)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -79,11 +122,38 @@ async fn results_streams_rows() {
         .mount(&server)
         .await;
 
-    let stream = client(&server).arena().results("abc").await.unwrap();
+    let stream = client(&server)
+        .arena()
+        .results("abc", None, None)
+        .await
+        .unwrap();
     let results: Vec<_> = stream.collect().await;
 
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].as_ref().unwrap().username, "A");
+}
+
+#[tokio::test]
+async fn results_sends_nb_and_sheet() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/tournament/abc/results"))
+        .and(query_param("nb", "10"))
+        .and(query_param("sheet", "true"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string("{\"rank\":1,\"score\":20,\"username\":\"A\",\"rating\":2400}\n"),
+        )
+        .mount(&server)
+        .await;
+
+    let stream = client(&server)
+        .arena()
+        .results("abc", Some(10), Some(true))
+        .await
+        .unwrap();
+    let results: Vec<_> = stream.collect().await;
+    assert_eq!(results.len(), 1);
 }
 
 #[tokio::test]
@@ -93,14 +163,53 @@ async fn games_streams_with_ndjson_accept() {
     Mock::given(method("GET"))
         .and(path("/api/tournament/abc/games"))
         .and(header("accept", "application/x-ndjson"))
+        .and(query_param_is_missing("player"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
-    let stream = client(&server).arena().games("abc").await.unwrap();
+    let stream = client(&server).arena().games("abc").stream().await.unwrap();
     let games: Vec<_> = stream.collect().await;
 
     assert_eq!(games.len(), 2);
+}
+
+#[tokio::test]
+async fn games_sends_player_and_export_params() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/tournament/abc/games"))
+        .and(query_param("player", "bobby"))
+        .and(query_param("clocks", "true"))
+        .and(query_param("opening", "true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{\"id\":\"g1\"}\n"))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server)
+        .arena()
+        .games("abc")
+        .player("bobby")
+        .export(GameExportOptions::default().clocks(true).opening(true))
+        .stream()
+        .await
+        .unwrap();
+    let games: Vec<_> = stream.collect().await;
+    assert_eq!(games.len(), 1);
+}
+
+#[tokio::test]
+async fn games_pgn_sets_accept_header() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/tournament/abc/games"))
+        .and(header("accept", "application/x-chess-pgn"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"x\"]\n\n1. e4 *"))
+        .mount(&server)
+        .await;
+
+    let pgn = client(&server).arena().games("abc").pgn().await.unwrap();
+    assert!(pgn.contains("1. e4"));
 }
 
 #[tokio::test]
@@ -140,10 +249,16 @@ async fn created_by_streams_arenas() {
     let body = "{\"id\":\"a\"}\n{\"id\":\"b\"}\n";
     Mock::given(method("GET"))
         .and(path("/api/user/bob/tournament/created"))
+        .and(query_param("nb", "5"))
+        .and(query_param("status", "10"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
-    let stream = client(&server).arena().created_by("bob").await.unwrap();
+    let stream = client(&server)
+        .arena()
+        .created_by("bob", Some(5), &[10, 20])
+        .await
+        .unwrap();
     let arenas: Vec<_> = stream.collect().await;
     assert_eq!(arenas.len(), 2);
 }
@@ -154,10 +269,11 @@ async fn get_returns_full_arena() {
     let body = r#"{"id":"abc","fullName":"Hourly","nbPlayers":50}"#;
     Mock::given(method("GET"))
         .and(path("/api/tournament/abc"))
+        .and(query_param("page", "2"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
-    let arena = client(&server).arena().get("abc").await.unwrap();
+    let arena = client(&server).arena().get("abc", Some(2)).await.unwrap();
     assert_eq!(arena.id, "abc");
 }
 
@@ -185,10 +301,16 @@ async fn played_by_streams_arenas() {
     let body = "{\"id\":\"a\"}\n{\"id\":\"b\"}\n";
     Mock::given(method("GET"))
         .and(path("/api/user/bob/tournament/played"))
+        .and(query_param("nb", "3"))
+        .and(query_param("performance", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
-    let stream = client(&server).arena().played_by("bob").await.unwrap();
+    let stream = client(&server)
+        .arena()
+        .played_by("bob", Some(3), Some(true))
+        .await
+        .unwrap();
     let arenas: Vec<_> = stream.collect().await;
     assert_eq!(arenas.len(), 2);
 }

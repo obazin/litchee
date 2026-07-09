@@ -37,6 +37,10 @@ struct NextQuery<'a> {
 struct ActivityQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
     max: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    before: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    since: Option<i64>,
 }
 
 impl<'a> PuzzlesApi<'a> {
@@ -83,27 +87,38 @@ impl<'a> PuzzlesApi<'a> {
 
     /// Streams the authenticated user's puzzle activity, most recent first.
     ///
-    /// Requires the `puzzle:read` scope. `GET /api/puzzle/activity`
+    /// `before`/`since` bound the window by timestamp (ms). Requires the
+    /// `puzzle:read` scope. `GET /api/puzzle/activity`
     pub async fn activity(
         &self,
         max: Option<u32>,
+        before: Option<i64>,
+        since: Option<i64>,
     ) -> Result<BoxStream<'static, Result<LichessPuzzleActivity>>> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/puzzle/activity")
-            .query(&ActivityQuery { max });
+            .query(&ActivityQuery { max, before, since });
         http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Gets a batch of puzzles for the given angle (theme/opening).
     ///
-    /// `GET /api/puzzle/batch/{angle}`
-    pub async fn batch(&self, angle: &str, nb: u32) -> Result<LichessPuzzleBatch> {
+    /// `difficulty` (e.g. `easiest`…`hardest`) and `color` (`white`/`black`)
+    /// tune the selection. `GET /api/puzzle/batch/{angle}`
+    pub async fn batch(
+        &self,
+        angle: &str,
+        nb: u32,
+        difficulty: Option<&str>,
+        color: Option<&str>,
+    ) -> Result<LichessPuzzleBatch> {
         let path = format!("/api/puzzle/batch/{}", http::segment(angle));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
-            .query(&[("nb", nb)]);
+            .query(&[("nb", nb.to_string())])
+            .query(&[("difficulty", difficulty), ("color", color)]);
         http::json(request, "LichessPuzzleBatch").await
     }
 
@@ -145,10 +160,17 @@ impl<'a> PuzzlesApi<'a> {
 
     /// Gets a user's Puzzle Storm dashboard.
     ///
-    /// `GET /api/storm/dashboard/{username}`
-    pub async fn storm_dashboard(&self, username: &str) -> Result<LichessStormDashboard> {
+    /// `days` sets how many days of history to include. `GET /api/storm/dashboard/{username}`
+    pub async fn storm_dashboard(
+        &self,
+        username: &str,
+        days: Option<u32>,
+    ) -> Result<LichessStormDashboard> {
         let path = format!("/api/storm/dashboard/{}", http::segment(username));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("days", days)]);
         http::json(request, "LichessStormDashboard").await
     }
 
@@ -290,6 +312,19 @@ pub struct LichessPuzzleActivity {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn activity_query_omits_unset_fields() {
+        let query = ActivityQuery {
+            max: Some(10),
+            before: None,
+            since: Some(5),
+        };
+        assert_eq!(
+            serde_urlencoded::to_string(&query).unwrap(),
+            "max=10&since=5"
+        );
+    }
 
     #[test]
     fn parses_puzzle_and_game() {

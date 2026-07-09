@@ -238,6 +238,13 @@ impl<'a> SeekRequest<'a> {
         self
     }
 
+    /// Restricts opponents to this rating band, e.g. `"1500-1800"`.
+    #[must_use]
+    pub fn rating_range(mut self, range: &'a str) -> Self {
+        self.form.rating_range = Some(range);
+        self
+    }
+
     /// Sends the seek, returning a stream to hold open.
     pub async fn send(self) -> Result<BoxStream<'static, Result<Value>>> {
         let request = self

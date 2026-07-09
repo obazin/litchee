@@ -17,6 +17,7 @@
 //! environments these run in. Its DTOs are exercised by the mocked tests.
 
 use litchee::LichessClient;
+use litchee::api::users::players::UserQuery;
 
 /// The Lichess founder's account — a permanent, stable public profile.
 const STABLE_USER: &str = "thibault";
@@ -30,7 +31,7 @@ const KQK_FEN: &str = "4k3/8/8/8/8/8/8/4KQ2 w - - 0 1";
 async fn user_public_profile() {
     let user = LichessClient::new()
         .users()
-        .get(STABLE_USER)
+        .get(STABLE_USER, &UserQuery::default())
         .await
         .expect("fetch public profile");
     assert_eq!(user.user.id, STABLE_USER);
@@ -42,7 +43,7 @@ async fn user_public_profile() {
 async fn users_status() {
     let statuses = LichessClient::new()
         .users()
-        .statuses(&[STABLE_USER])
+        .statuses(&[STABLE_USER], None, None, None)
         .await
         .expect("fetch user status");
     assert_eq!(statuses.first().expect("one status").id, STABLE_USER);
@@ -81,7 +82,7 @@ async fn fide_player() {
 async fn tablebase_standard() {
     let position = LichessClient::new()
         .tablebase()
-        .standard(KQK_FEN)
+        .standard(KQK_FEN, None)
         .await
         .expect("query tablebase");
     assert!(!position.moves.is_empty(), "KQ vs K has legal moves");

@@ -2,6 +2,7 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
+use litchee::api::social::teams::TeamTournamentQuery;
 use wiremock::matchers::{body_string_contains, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -51,11 +52,16 @@ async fn members_streams_users() {
     let body = "{\"id\":\"a\",\"username\":\"A\"}\n{\"id\":\"b\",\"username\":\"B\"}\n";
     Mock::given(method("GET"))
         .and(path("/api/team/coders/users"))
+        .and(query_param("full", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
-    let stream = client(&server).teams().members("coders").await.unwrap();
+    let stream = client(&server)
+        .teams()
+        .members("coders", Some(true))
+        .await
+        .unwrap();
     let members: Vec<_> = stream.collect().await;
 
     assert_eq!(members.len(), 2);
@@ -101,12 +107,17 @@ async fn arena_tournaments_streams() {
     let body = "{\"id\":\"a\"}\n{\"id\":\"b\"}\n";
     Mock::given(method("GET"))
         .and(path("/api/team/coders/arena"))
+        .and(query_param("max", "10"))
+        .and(query_param("name", "Weekly"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
     let stream = client(&server)
         .teams()
-        .arena_tournaments("coders")
+        .arena_tournaments(
+            "coders",
+            &TeamTournamentQuery::default().max(10).name("Weekly"),
+        )
         .await
         .unwrap();
     let arenas: Vec<_> = stream.collect().await;
@@ -198,13 +209,14 @@ async fn join_requests_returns_requests() {
         "user":{"id":"mary","username":"Mary"}}]"#;
     Mock::given(method("GET"))
         .and(path("/api/team/coders/requests"))
+        .and(query_param("declined", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
     let requests = client(&server)
         .teams()
-        .join_requests("coders")
+        .join_requests("coders", Some(true))
         .await
         .unwrap();
 
@@ -233,13 +245,14 @@ async fn swiss_tournaments_streams() {
     let body = "{\"id\":\"a\"}\n{\"id\":\"b\"}\n";
     Mock::given(method("GET"))
         .and(path("/api/team/coders/swiss"))
+        .and(query_param("status", "started"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
     let stream = client(&server)
         .teams()
-        .swiss_tournaments("coders")
+        .swiss_tournaments("coders", &TeamTournamentQuery::default().status("started"))
         .await
         .unwrap();
     let swisses: Vec<_> = stream.collect().await;

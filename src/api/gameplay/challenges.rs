@@ -4,8 +4,11 @@
 
 use std::collections::HashMap;
 
+use futures_util::stream::BoxStream;
 use reqwest::Method;
+use reqwest::header::ACCEPT;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::api::gameplay::games::LichessGame;
 use crate::client::LichessClient;
@@ -56,10 +59,16 @@ impl<'a> ChallengesApi<'a> {
     }
 
     /// Accepts an incoming challenge.
+    ///
+    /// `color` picks a side, valid only for open challenges.
     /// `POST /api/challenge/{challengeId}/accept`
-    pub async fn accept(&self, challenge_id: &str) -> Result<()> {
+    pub async fn accept(&self, challenge_id: &str, color: Option<&str>) -> Result<()> {
         let path = format!("/api/challenge/{}/accept", http::segment(challenge_id));
-        http::ok(self.client.request(Method::POST, Host::Default, &path)).await
+        let request = self
+            .client
+            .request(Method::POST, Host::Default, &path)
+            .query(&[("color", color)]);
+        http::ok(request).await
     }
 
     /// Declines an incoming challenge, optionally with a reason key.
@@ -74,10 +83,17 @@ impl<'a> ChallengesApi<'a> {
     }
 
     /// Cancels a challenge you sent.
+    ///
+    /// `opponent_token` (the opponent's `challenge:write` token) lets the game
+    /// be canceled even after both players moved.
     /// `POST /api/challenge/{challengeId}/cancel`
-    pub async fn cancel(&self, challenge_id: &str) -> Result<()> {
+    pub async fn cancel(&self, challenge_id: &str, opponent_token: Option<&str>) -> Result<()> {
         let path = format!("/api/challenge/{}/cancel", http::segment(challenge_id));
-        http::ok(self.client.request(Method::POST, Host::Default, &path)).await
+        let request = self
+            .client
+            .request(Method::POST, Host::Default, &path)
+            .query(&[("opponentToken", opponent_token)]);
+        http::ok(request).await
     }
 
     /// Adds time to the opponent's clock in an ongoing game.
@@ -148,6 +164,10 @@ struct ChallengeForm<'a> {
     variant: Option<LichessVariantKey>,
     #[serde(skip_serializing_if = "Option::is_none")]
     fen: Option<&'a str>,
+    #[serde(rename = "keepAliveStream", skip_serializing_if = "Option::is_none")]
+    keep_alive_stream: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rules: Option<&'a str>,
 }
 
 /// Builder for challenging a specific user.
@@ -211,14 +231,34 @@ impl<'a> ChallengeRequest<'a> {
         self
     }
 
-    /// Sends the challenge.
+    /// Sets extra game rules (comma-separated, e.g. `noRematch,noGiveTime`).
+    #[must_use]
+    pub fn rules(mut self, rules: &'a str) -> Self {
+        self.form.rules = Some(rules);
+        self
+    }
+
+    /// Sends the challenge, returning it immediately.
     pub async fn send(self) -> Result<LichessChallenge> {
-        let path = format!("/api/challenge/{}", http::segment(self.username));
-        let request = self
-            .client
-            .request(Method::POST, Host::Default, &path)
-            .form(&self.form);
+        let request = self.request();
         http::json(request, "LichessChallenge").await
+    }
+
+    /// Sends the challenge with `keepAliveStream`, returning an NDJSON stream
+    /// that is held open and emits status updates (e.g. `{"done":"accepted"}`)
+    /// until the challenge is accepted, declined, or canceled.
+    pub async fn stream(mut self) -> Result<BoxStream<'static, Result<Value>>> {
+        self.form.keep_alive_stream = Some(true);
+        let request = self.request().header(ACCEPT, http::ACCEPT_NDJSON);
+        http::stream(request, self.client.max_line_bytes()).await
+    }
+
+    /// Builds the POST request for the challenge form.
+    fn request(&self) -> http::ApiRequest {
+        let path = format!("/api/challenge/{}", http::segment(self.username));
+        self.client
+            .request(Method::POST, Host::Default, &path)
+            .form(&self.form)
     }
 }
 
@@ -325,6 +365,14 @@ struct OpenForm<'a> {
     variant: Option<LichessVariantKey>,
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fen: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rules: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    users: Option<&'a str>,
+    #[serde(rename = "expiresAt", skip_serializing_if = "Option::is_none")]
+    expires_at: Option<i64>,
 }
 
 /// Builder for an open challenge that anyone can accept.
@@ -376,6 +424,35 @@ impl<'a> OpenChallengeRequest<'a> {
     #[must_use]
     pub fn name(mut self, name: &'a str) -> Self {
         self.form.name = Some(name);
+        self
+    }
+
+    /// Sets a custom starting position (FEN).
+    #[must_use]
+    pub fn fen(mut self, fen: &'a str) -> Self {
+        self.form.fen = Some(fen);
+        self
+    }
+
+    /// Sets extra game rules (comma-separated, e.g. `noRematch,noGiveTime`).
+    #[must_use]
+    pub fn rules(mut self, rules: &'a str) -> Self {
+        self.form.rules = Some(rules);
+        self
+    }
+
+    /// Restricts who may play to these two usernames (comma-separated); the
+    /// game is then created between them.
+    #[must_use]
+    pub fn users(mut self, users: &'a str) -> Self {
+        self.form.users = Some(users);
+        self
+    }
+
+    /// Sets when the challenge expires (Unix milliseconds).
+    #[must_use]
+    pub fn expires_at(mut self, timestamp: i64) -> Self {
+        self.form.expires_at = Some(timestamp);
         self
     }
 

@@ -144,7 +144,7 @@ use litchee::LichessClient;
 let client = LichessClient::builder().token("lip_your_token").build()?;
 
 // Stream the authenticated user's puzzle history (needs the `puzzle:read` scope).
-let mut activity = client.puzzles().activity(Some(50)).await?;
+let mut activity = client.puzzles().activity(Some(50), None, None).await?;
 while let Some(round) = activity.next().await {
     let round = round?;
     let outcome = if round.win { "solved" } else { "failed" };
@@ -167,7 +167,10 @@ let client = LichessClient::builder().token("lip_your_token").build()?;
 let mut studies = client.studies().list_metadata("bobby").await?;
 if let Some(study) = studies.next().await {
     let study = study?;
-    let pgn = client.studies().export_study_pgn(&study.id).await?;
+    let pgn = client
+        .studies()
+        .export_study_pgn(&study.id, &Default::default())
+        .await?;
     println!("{} — {} bytes of PGN", study.name, pgn.len());
 }
 # Ok(())
@@ -184,12 +187,15 @@ use litchee::LichessClient;
 let client = LichessClient::new();
 
 // Browse official broadcasts, then export a round's games as PGN.
-let mut official = client.broadcasts().official().await?;
+let mut official = client.broadcasts().official(None, None, None).await?;
 if let Some(broadcast) = official.next().await {
     let broadcast = broadcast?;
     println!("Broadcast: {}", broadcast.tour.name);
     if let Some(round) = broadcast.rounds.first() {
-        let pgn = client.broadcasts().round_pgn(&round.id).await?;
+        let pgn = client
+            .broadcasts()
+            .round_pgn(&round.id, &Default::default())
+            .await?;
         println!("Round '{}' — {} bytes of PGN", round.name, pgn.len());
     }
 }

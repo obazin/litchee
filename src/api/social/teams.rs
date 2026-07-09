@@ -71,9 +71,18 @@ impl<'a> TeamsApi<'a> {
     }
 
     /// Streams the members of a team. `GET /api/team/{teamId}/users`
-    pub async fn members(&self, team_id: &str) -> Result<BoxStream<'static, Result<LichessUser>>> {
+    ///
+    /// `full` includes each member's full profile.
+    pub async fn members(
+        &self,
+        team_id: &str,
+        full: Option<bool>,
+    ) -> Result<BoxStream<'static, Result<LichessUser>>> {
         let path = format!("/api/team/{}/users", http::segment(team_id));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("full", full)]);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
@@ -123,9 +132,18 @@ impl<'a> TeamsApi<'a> {
     }
 
     /// Lists pending join requests. `GET /api/team/{teamId}/requests`
-    pub async fn join_requests(&self, team_id: &str) -> Result<Vec<LichessTeamRequestWithUser>> {
+    ///
+    /// `declined` lists the declined requests instead of the pending ones.
+    pub async fn join_requests(
+        &self,
+        team_id: &str,
+        declined: Option<bool>,
+    ) -> Result<Vec<LichessTeamRequestWithUser>> {
         let path = format!("/api/team/{}/requests", http::segment(team_id));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("declined", declined)]);
         http::json(request, "Vec<LichessTeamRequestWithUser>").await
     }
 
@@ -156,9 +174,13 @@ impl<'a> TeamsApi<'a> {
     pub async fn arena_tournaments(
         &self,
         team_id: &str,
+        query: &TeamTournamentQuery<'_>,
     ) -> Result<BoxStream<'static, Result<LichessArena>>> {
         let path = format!("/api/team/{}/arena", http::segment(team_id));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(query);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
@@ -167,10 +189,57 @@ impl<'a> TeamsApi<'a> {
     pub async fn swiss_tournaments(
         &self,
         team_id: &str,
+        query: &TeamTournamentQuery<'_>,
     ) -> Result<BoxStream<'static, Result<LichessSwiss>>> {
         let path = format!("/api/team/{}/swiss", http::segment(team_id));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(query);
         http::stream(request, self.client.max_line_bytes()).await
+    }
+}
+
+/// Filter parameters for a team's arena/swiss tournament listings.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct TeamTournamentQuery<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<&'a str>,
+    #[serde(rename = "createdBy", skip_serializing_if = "Option::is_none")]
+    created_by: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<&'a str>,
+}
+
+impl<'a> TeamTournamentQuery<'a> {
+    /// Maximum number of tournaments to return.
+    #[must_use]
+    pub fn max(mut self, max: u32) -> Self {
+        self.max = Some(max);
+        self
+    }
+
+    /// Filter by tournament status (`created`, `started`, or `finished`).
+    #[must_use]
+    pub fn status(mut self, status: &'a str) -> Self {
+        self.status = Some(status);
+        self
+    }
+
+    /// Only tournaments created by this user.
+    #[must_use]
+    pub fn created_by(mut self, username: &'a str) -> Self {
+        self.created_by = Some(username);
+        self
+    }
+
+    /// Only tournaments whose name contains this text.
+    #[must_use]
+    pub fn name(mut self, name: &'a str) -> Self {
+        self.name = Some(name);
+        self
     }
 }
 
@@ -269,6 +338,20 @@ pub struct LichessTeamRequestWithUser {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn team_tournament_query_serializes_filters() {
+        let query = TeamTournamentQuery::default()
+            .max(10)
+            .status("started")
+            .created_by("thibault");
+        let encoded = serde_urlencoded::to_string(&query).unwrap();
+        assert_eq!(encoded, "max=10&status=started&createdBy=thibault");
+        assert_eq!(
+            serde_urlencoded::to_string(TeamTournamentQuery::default()).unwrap(),
+            ""
+        );
+    }
 
     #[test]
     fn join_form_debug_redacts_password() {

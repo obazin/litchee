@@ -2,8 +2,12 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
+use litchee::api::tournaments::swiss::SwissConditions;
 use litchee::error::{ApiErrorKind, LichessError};
-use wiremock::matchers::{body_string_contains, header, method, path};
+use litchee::model::GameExportOptions;
+use wiremock::matchers::{
+    body_string_contains, header, method, path, query_param, query_param_is_missing,
+};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> LichessClient {
@@ -53,6 +57,36 @@ async fn create_posts_to_team_path_with_clock() {
 }
 
 #[tokio::test]
+async fn create_posts_conditions_and_extra_fields() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/swiss/new/coders"))
+        .and(body_string_contains("password=secret"))
+        .and(body_string_contains("forbiddenPairings="))
+        .and(body_string_contains("conditions.minRating.rating=1500"))
+        .and(body_string_contains("conditions.playYourGames=true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"new2"}"#))
+        .mount(&server)
+        .await;
+
+    let swiss = client(&server)
+        .swiss()
+        .create("coders", 300, 0, 7)
+        .password("secret")
+        .forbidden_pairings("alice bob")
+        .conditions(
+            SwissConditions::default()
+                .min_rating(1500)
+                .play_your_games(true),
+        )
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(swiss.id, "new2");
+}
+
+#[tokio::test]
 async fn create_401_stays_generic_unauthorized() {
     // Only edit/schedule remap 401 to SwissUnauthorizedEdit; create must not.
     let server = MockServer::start().await;
@@ -78,11 +112,16 @@ async fn join_posts_to_the_join_path() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/api/swiss/abc/join"))
+        .and(body_string_contains("password=secret"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
         .mount(&server)
         .await;
 
-    client(&server).swiss().join("abc").await.unwrap();
+    client(&server)
+        .swiss()
+        .join("abc", Some("secret"))
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -110,11 +149,16 @@ async fn results_streams_rows() {
     );
     Mock::given(method("GET"))
         .and(path("/api/swiss/abc/results"))
+        .and(query_param("nb", "50"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
-    let stream = client(&server).swiss().results("abc").await.unwrap();
+    let stream = client(&server)
+        .swiss()
+        .results("abc", Some(50))
+        .await
+        .unwrap();
     let results: Vec<_> = stream.collect().await;
 
     assert_eq!(results.len(), 2);
@@ -179,7 +223,7 @@ async fn schedule_next_round_401_maps_to_swiss_unauthorized_edit() {
         .await;
     let err = client(&server)
         .swiss()
-        .schedule_next_round("abc")
+        .schedule_next_round("abc", None)
         .await
         .unwrap_err();
     assert!(matches!(
@@ -220,7 +264,7 @@ async fn schedule_next_round_posts_to_the_schedule_path() {
         .await;
     client(&server)
         .swiss()
-        .schedule_next_round("abc")
+        .schedule_next_round("abc", None)
         .await
         .unwrap();
 }
@@ -232,10 +276,46 @@ async fn games_streams_with_ndjson_accept() {
     Mock::given(method("GET"))
         .and(path("/api/swiss/abc/games"))
         .and(header("accept", "application/x-ndjson"))
+        .and(query_param_is_missing("player"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
-    let stream = client(&server).swiss().games("abc").await.unwrap();
+    let stream = client(&server).swiss().games("abc").stream().await.unwrap();
     let games: Vec<_> = stream.collect().await;
     assert_eq!(games.len(), 2);
+}
+
+#[tokio::test]
+async fn games_sends_player_and_export_params() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/swiss/abc/games"))
+        .and(query_param("player", "bobby"))
+        .and(query_param("clocks", "true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{\"id\":\"g1\"}\n"))
+        .mount(&server)
+        .await;
+    let stream = client(&server)
+        .swiss()
+        .games("abc")
+        .player("bobby")
+        .export(GameExportOptions::default().clocks(true))
+        .stream()
+        .await
+        .unwrap();
+    let games: Vec<_> = stream.collect().await;
+    assert_eq!(games.len(), 1);
+}
+
+#[tokio::test]
+async fn games_pgn_sets_accept_header() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/swiss/abc/games"))
+        .and(header("accept", "application/x-chess-pgn"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"x\"]\n\n1. e4 *"))
+        .mount(&server)
+        .await;
+    let pgn = client(&server).swiss().games("abc").pgn().await.unwrap();
+    assert!(pgn.contains("1. e4"));
 }

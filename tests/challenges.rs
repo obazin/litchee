@@ -1,8 +1,9 @@
 //! Integration tests for the Challenges API.
 
+use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::gameplay::challenges::LichessChallengeColor;
-use wiremock::matchers::{body_string_contains, method, path, query_param};
+use wiremock::matchers::{body_string_contains, header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> LichessClient {
@@ -37,6 +38,7 @@ async fn challenge_user_posts_clock_form_fields() {
         .and(path("/api/challenge/bobby"))
         .and(body_string_contains("clock.limit=600"))
         .and(body_string_contains("color=white"))
+        .and(body_string_contains("rules=noRematch"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
@@ -47,11 +49,36 @@ async fn challenge_user_posts_clock_form_fields() {
         .rated(true)
         .clock(600, 0)
         .color(LichessChallengeColor::White)
+        .rules("noRematch")
         .send()
         .await
         .unwrap();
 
     assert_eq!(challenge.id, "H9fIRZUk");
+}
+
+#[tokio::test]
+async fn challenge_stream_sends_keep_alive_and_streams_status() {
+    let server = MockServer::start().await;
+    let body = "{\"challenge\":{\"id\":\"c1\"}}\n{\"done\":\"accepted\"}\n";
+    Mock::given(method("POST"))
+        .and(path("/api/challenge/bobby"))
+        .and(header("accept", "application/x-ndjson"))
+        .and(body_string_contains("keepAliveStream=true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server)
+        .challenges()
+        .challenge("bobby")
+        .clock(600, 0)
+        .stream()
+        .await
+        .unwrap();
+    let updates: Vec<_> = stream.collect().await;
+    assert_eq!(updates.len(), 2);
+    assert_eq!(updates[1].as_ref().unwrap()["done"], "accepted");
 }
 
 #[tokio::test]
@@ -80,11 +107,16 @@ async fn accept_posts_to_accept_path() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/api/challenge/abc/accept"))
+        .and(query_param("color", "white"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
         .mount(&server)
         .await;
 
-    client(&server).challenges().accept("abc").await.unwrap();
+    client(&server)
+        .challenges()
+        .accept("abc", Some("white"))
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -127,6 +159,9 @@ async fn create_open_posts_form() {
     Mock::given(method("POST"))
         .and(path("/api/challenge/open"))
         .and(body_string_contains("clock.limit=300"))
+        .and(body_string_contains("rules=noRematch"))
+        .and(body_string_contains("users=alice%2Cbob"))
+        .and(body_string_contains("expiresAt=1700000000000"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
@@ -135,6 +170,9 @@ async fn create_open_posts_form() {
         .create_open()
         .rated(false)
         .clock(300, 0)
+        .rules("noRematch")
+        .users("alice,bob")
+        .expires_at(1_700_000_000_000)
         .send()
         .await
         .unwrap();
@@ -195,9 +233,14 @@ async fn cancel_posts_to_cancel_path() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/api/challenge/abc/cancel"))
+        .and(query_param("opponentToken", "tok"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
         .mount(&server)
         .await;
 
-    client(&server).challenges().cancel("abc").await.unwrap();
+    client(&server)
+        .challenges()
+        .cancel("abc", Some("tok"))
+        .await
+        .unwrap();
 }

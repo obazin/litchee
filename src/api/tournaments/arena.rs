@@ -11,10 +11,10 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
-use crate::model::{LichessLightUser, LichessTitle, LichessVariantKey};
+use crate::model::{GameExportOptions, LichessLightUser, LichessTitle, LichessVariantKey};
 
-/// Form body for creating an arena tournament.
-#[derive(Debug, Serialize)]
+/// Form body for creating an arena tournament (flat, non-`conditions` fields).
+#[derive(Debug, Default, Serialize)]
 struct CreateForm<'a> {
     name: &'a str,
     #[serde(rename = "clockTime")]
@@ -28,6 +28,122 @@ struct CreateForm<'a> {
     variant: Option<LichessVariantKey>,
     #[serde(rename = "waitMinutes", skip_serializing_if = "Option::is_none")]
     wait_minutes: Option<u32>,
+    #[serde(rename = "startDate", skip_serializing_if = "Option::is_none")]
+    start_date: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    position: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    berserkable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    streakable: Option<bool>,
+    #[serde(rename = "hasChat", skip_serializing_if = "Option::is_none")]
+    has_chat: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    password: Option<&'a str>,
+    #[serde(rename = "teamBattleByTeam", skip_serializing_if = "Option::is_none")]
+    team_battle_by_team: Option<&'a str>,
+}
+
+/// Entry conditions for an arena tournament, serialized as `conditions.*` keys.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ArenaConditions<'a> {
+    #[serde(
+        rename = "conditions.minRating.rating",
+        skip_serializing_if = "Option::is_none"
+    )]
+    min_rating: Option<u32>,
+    #[serde(
+        rename = "conditions.maxRating.rating",
+        skip_serializing_if = "Option::is_none"
+    )]
+    max_rating: Option<u32>,
+    #[serde(
+        rename = "conditions.nbRatedGame.nb",
+        skip_serializing_if = "Option::is_none"
+    )]
+    nb_rated_games: Option<u32>,
+    #[serde(
+        rename = "conditions.allowList",
+        skip_serializing_if = "Option::is_none"
+    )]
+    allow_list: Option<&'a str>,
+    #[serde(
+        rename = "conditions.teamMember.teamId",
+        skip_serializing_if = "Option::is_none"
+    )]
+    team_member: Option<&'a str>,
+    #[serde(rename = "conditions.bots", skip_serializing_if = "Option::is_none")]
+    bots: Option<bool>,
+    #[serde(
+        rename = "conditions.accountAge",
+        skip_serializing_if = "Option::is_none"
+    )]
+    account_age: Option<u32>,
+}
+
+impl<'a> ArenaConditions<'a> {
+    /// Minimum rating to join.
+    #[must_use]
+    pub fn min_rating(mut self, rating: u32) -> Self {
+        self.min_rating = Some(rating);
+        self
+    }
+
+    /// Maximum rating to join (best rating over the last 7 days).
+    #[must_use]
+    pub fn max_rating(mut self, rating: u32) -> Self {
+        self.max_rating = Some(rating);
+        self
+    }
+
+    /// Minimum number of rated games required to join.
+    #[must_use]
+    pub fn nb_rated_games(mut self, count: u32) -> Self {
+        self.nb_rated_games = Some(count);
+        self
+    }
+
+    /// Comma-separated usernames allowed to join (append `%titled` to also allow
+    /// any titled player).
+    #[must_use]
+    pub fn allow_list(mut self, usernames: &'a str) -> Self {
+        self.allow_list = Some(usernames);
+        self
+    }
+
+    /// Restrict entry to members of this team.
+    #[must_use]
+    pub fn team_member(mut self, team_id: &'a str) -> Self {
+        self.team_member = Some(team_id);
+        self
+    }
+
+    /// Whether bots may join.
+    #[must_use]
+    pub fn bots(mut self, allowed: bool) -> Self {
+        self.bots = Some(allowed);
+        self
+    }
+
+    /// Minimum account age in days required to join.
+    #[must_use]
+    pub fn account_age(mut self, days: u32) -> Self {
+        self.account_age = Some(days);
+        self
+    }
+}
+
+/// Form body for joining an arena tournament.
+#[derive(Debug, Serialize)]
+struct JoinArenaForm<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    password: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    team: Option<&'a str>,
+    #[serde(rename = "pairMeAsap", skip_serializing_if = "Option::is_none")]
+    pair_me_asap: Option<bool>,
 }
 
 /// Accessor for the Arena Tournaments API.
@@ -51,9 +167,14 @@ impl<'a> ArenaApi<'a> {
     }
 
     /// Gets full details of a tournament. `GET /api/tournament/{id}`
-    pub async fn get(&self, id: &str) -> Result<LichessArenaFull> {
+    ///
+    /// `page` selects a page of the standings (defaults to the first).
+    pub async fn get(&self, id: &str, page: Option<u32>) -> Result<LichessArenaFull> {
         let path = format!("/api/tournament/{}", http::segment(id));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("page", page)]);
         http::json(request, "LichessArenaFull").await
     }
 
@@ -124,30 +245,66 @@ impl<'a> ArenaApi<'a> {
 
     /// Streams the arenas created by a user (NDJSON).
     /// `GET /api/user/{username}/tournament/created`
+    ///
+    /// `nb` limits the count; `status` filters by one or more tournament status
+    /// codes (repeatable — pass several to combine them).
     pub async fn created_by(
         &self,
         username: &str,
+        nb: Option<u32>,
+        status: &[u32],
     ) -> Result<BoxStream<'static, Result<LichessArena>>> {
         let path = format!("/api/user/{}/tournament/created", http::segment(username));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let status: Vec<(&str, u32)> = status.iter().map(|code| ("status", *code)).collect();
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("nb", nb)])
+            .query(&status);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Streams the arenas a user has played (NDJSON).
     /// `GET /api/user/{username}/tournament/played`
+    ///
+    /// `nb` limits the count; `performance` includes performance ratings.
     pub async fn played_by(
         &self,
         username: &str,
+        nb: Option<u32>,
+        performance: Option<bool>,
     ) -> Result<BoxStream<'static, Result<LichessArena>>> {
         let path = format!("/api/user/{}/tournament/played", http::segment(username));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("nb", nb)])
+            .query(&[("performance", performance)]);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
     /// Joins a tournament. `POST /api/tournament/{id}/join`
-    pub async fn join(&self, id: &str) -> Result<()> {
+    ///
+    /// `password` is the entry code (or user-specific code); `team` picks the
+    /// team for a team battle; `pair_me_asap` requests immediate pairing.
+    pub async fn join(
+        &self,
+        id: &str,
+        password: Option<&str>,
+        team: Option<&str>,
+        pair_me_asap: Option<bool>,
+    ) -> Result<()> {
         let path = format!("/api/tournament/{}/join", http::segment(id));
-        http::ok(self.client.request(Method::POST, Host::Default, &path)).await
+        let form = JoinArenaForm {
+            password,
+            team,
+            pair_me_asap,
+        };
+        let request = self
+            .client
+            .request(Method::POST, Host::Default, &path)
+            .form(&form);
+        http::ok(request).await
     }
 
     /// Withdraws from a tournament. `POST /api/tournament/{id}/withdraw`
@@ -163,23 +320,87 @@ impl<'a> ArenaApi<'a> {
     }
 
     /// Streams a tournament's results. `GET /api/tournament/{id}/results`
+    ///
+    /// `nb` limits the count; `sheet` includes each player's score sheet.
     pub async fn results(
         &self,
         id: &str,
+        nb: Option<u32>,
+        sheet: Option<bool>,
     ) -> Result<BoxStream<'static, Result<LichessArenaResult>>> {
         let path = format!("/api/tournament/{}/results", http::segment(id));
-        let request = self.client.request(Method::GET, Host::Default, &path);
-        http::stream(request, self.client.max_line_bytes()).await
-    }
-
-    /// Streams a tournament's games as NDJSON. `GET /api/tournament/{id}/games`
-    pub async fn games(&self, id: &str) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/tournament/{}/games", http::segment(id));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
-            .header(reqwest::header::ACCEPT, "application/x-ndjson");
+            .query(&[("nb", nb)])
+            .query(&[("sheet", sheet)]);
         http::stream(request, self.client.max_line_bytes()).await
+    }
+
+    /// Starts an export of a tournament's games. `GET /api/tournament/{id}/games`
+    ///
+    /// Finish with [`stream`](ArenaGamesRequest::stream) or
+    /// [`pgn`](ArenaGamesRequest::pgn).
+    #[must_use]
+    pub fn games(&self, id: &'a str) -> ArenaGamesRequest<'a> {
+        ArenaGamesRequest::new(self.client, id)
+    }
+}
+
+/// Builder for exporting an arena tournament's games
+/// (`GET /api/tournament/{id}/games`).
+#[derive(Debug)]
+pub struct ArenaGamesRequest<'a> {
+    client: &'a LichessClient,
+    id: &'a str,
+    player: Option<&'a str>,
+    export: GameExportOptions,
+}
+
+impl<'a> ArenaGamesRequest<'a> {
+    /// Creates the request builder.
+    pub(crate) fn new(client: &'a LichessClient, id: &'a str) -> Self {
+        Self {
+            client,
+            id,
+            player: None,
+            export: GameExportOptions::default(),
+        }
+    }
+
+    /// Only games featuring this player.
+    #[must_use]
+    pub fn player(mut self, player: &'a str) -> Self {
+        self.player = Some(player);
+        self
+    }
+
+    /// Sets the shared export-format options (moves, clocks, evals, …).
+    #[must_use]
+    pub fn export(mut self, options: GameExportOptions) -> Self {
+        self.export = options;
+        self
+    }
+
+    /// Executes the export, streaming games as decoded JSON values.
+    pub async fn stream(self) -> Result<BoxStream<'static, Result<LichessGame>>> {
+        let request = self.request(http::ACCEPT_NDJSON);
+        http::stream(request, self.client.max_line_bytes()).await
+    }
+
+    /// Executes the export, returning all games as one PGN string.
+    pub async fn pgn(self) -> Result<String> {
+        http::text(self.request(http::ACCEPT_PGN)).await
+    }
+
+    /// Builds the request with the given `Accept` representation.
+    fn request(&self, accept: &'static str) -> http::ApiRequest {
+        let path = format!("/api/tournament/{}/games", http::segment(self.id));
+        self.client
+            .request(Method::GET, Host::Default, &path)
+            .header(reqwest::header::ACCEPT, accept)
+            .query(&[("player", self.player)])
+            .query(&self.export)
     }
 }
 
@@ -189,6 +410,7 @@ pub struct CreateArenaRequest<'a> {
     client: &'a LichessClient,
     id: Option<&'a str>,
     form: CreateForm<'a>,
+    conditions: ArenaConditions<'a>,
 }
 
 impl<'a> CreateArenaRequest<'a> {
@@ -209,10 +431,9 @@ impl<'a> CreateArenaRequest<'a> {
                 clock_time,
                 clock_increment,
                 minutes,
-                rated: None,
-                variant: None,
-                wait_minutes: None,
+                ..Default::default()
             },
+            conditions: ArenaConditions::default(),
         }
     }
 
@@ -237,6 +458,69 @@ impl<'a> CreateArenaRequest<'a> {
         self
     }
 
+    /// Starts the tournament at this timestamp (ms), overriding `wait_minutes`.
+    #[must_use]
+    pub fn start_date(mut self, timestamp: i64) -> Self {
+        self.form.start_date = Some(timestamp);
+        self
+    }
+
+    /// Sets a custom starting position (FEN).
+    #[must_use]
+    pub fn position(mut self, fen: &'a str) -> Self {
+        self.form.position = Some(fen);
+        self
+    }
+
+    /// Sets whether players may berserk.
+    #[must_use]
+    pub fn berserkable(mut self, value: bool) -> Self {
+        self.form.berserkable = Some(value);
+        self
+    }
+
+    /// Sets whether win streaks grant bonus points.
+    #[must_use]
+    pub fn streakable(mut self, value: bool) -> Self {
+        self.form.streakable = Some(value);
+        self
+    }
+
+    /// Sets whether players can use the chat.
+    #[must_use]
+    pub fn has_chat(mut self, value: bool) -> Self {
+        self.form.has_chat = Some(value);
+        self
+    }
+
+    /// Sets the tournament description.
+    #[must_use]
+    pub fn description(mut self, description: &'a str) -> Self {
+        self.form.description = Some(description);
+        self
+    }
+
+    /// Makes the tournament private, restricted by this password / entry code.
+    #[must_use]
+    pub fn password(mut self, password: &'a str) -> Self {
+        self.form.password = Some(password);
+        self
+    }
+
+    /// Creates a team battle led by this team (creation only).
+    #[must_use]
+    pub fn team_battle_by_team(mut self, team_id: &'a str) -> Self {
+        self.form.team_battle_by_team = Some(team_id);
+        self
+    }
+
+    /// Sets the entry conditions.
+    #[must_use]
+    pub fn conditions(mut self, conditions: ArenaConditions<'a>) -> Self {
+        self.conditions = conditions;
+        self
+    }
+
     /// Creates or updates the tournament.
     pub async fn send(self) -> Result<LichessArenaFull> {
         let path = match self.id {
@@ -246,7 +530,7 @@ impl<'a> CreateArenaRequest<'a> {
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .form(&self.form);
+            .form_parts(&self.form, &self.conditions);
         http::json(request, "LichessArenaFull").await
     }
 }
@@ -475,6 +759,28 @@ mod tests {
             "duels":[{"whatever":true}],"stats":{"games":100}}"#;
         let full: LichessArenaFull = serde_json::from_str(json).unwrap();
         assert_eq!(full.standing.unwrap().players[0].name, "A");
+    }
+
+    #[test]
+    fn conditions_serialize_to_dotted_keys() {
+        let query = serde_urlencoded::to_string(
+            ArenaConditions::default()
+                .min_rating(1600)
+                .allow_list("a,b,%titled")
+                .bots(false),
+        )
+        .unwrap();
+        assert!(query.contains("conditions.minRating.rating=1600"));
+        assert!(query.contains("conditions.allowList=a%2Cb%2C%25titled"));
+        assert!(query.contains("conditions.bots=false"));
+    }
+
+    #[test]
+    fn empty_conditions_serialize_to_nothing() {
+        assert_eq!(
+            serde_urlencoded::to_string(ArenaConditions::default()).unwrap(),
+            ""
+        );
     }
 }
 

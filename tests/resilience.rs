@@ -73,7 +73,14 @@ async fn keepalives_within_the_window_keep_a_stream_alive() {
         .build()
         .unwrap();
 
-    let games: Vec<_> = client.swiss().games("g1").await.unwrap().collect().await;
+    let games: Vec<_> = client
+        .swiss()
+        .games("g1")
+        .stream()
+        .await
+        .unwrap()
+        .collect()
+        .await;
 
     assert_eq!(games.len(), 1);
     assert_eq!(games[0].as_ref().unwrap().id, "g1");
@@ -99,6 +106,7 @@ async fn line_exceeding_max_line_bytes_errors() {
     let first = client
         .swiss()
         .games("g1")
+        .stream()
         .await
         .unwrap()
         .next()

@@ -2,7 +2,8 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
-use litchee::model::LichessColor;
+use litchee::api::gameplay::games::GameSort;
+use litchee::model::{GameExportOptions, LichessColor};
 use wiremock::matchers::{body_string_contains, header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -20,6 +21,7 @@ async fn export_single_game_as_json() {
     let body = r#"{"id":"q7ZvsdUF","rated":true,"winner":"white","status":"mate"}"#;
     Mock::given(method("GET"))
         .and(path("/game/export/q7ZvsdUF"))
+        .and(header("accept", "application/json"))
         .and(query_param("evals", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
@@ -28,7 +30,7 @@ async fn export_single_game_as_json() {
     let game = client(&server)
         .games()
         .export("q7ZvsdUF")
-        .evals(true)
+        .export(GameExportOptions::default().evals(true))
         .json()
         .await
         .unwrap();
@@ -111,10 +113,11 @@ async fn now_playing_returns_games() {
         "opponent":{"id":"o","username":"O","rating":1500}}]}"#;
     Mock::given(method("GET"))
         .and(path("/api/account/playing"))
+        .and(query_param("nb", "10"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
-    let playing = client(&server).games().now_playing().await.unwrap();
+    let playing = client(&server).games().now_playing(Some(10)).await.unwrap();
     assert_eq!(playing.nb_my_turn, 1);
     assert_eq!(playing.now_playing[0].game_id, "g");
     assert_eq!(playing.now_playing[0].opponent.username, "O");
@@ -148,6 +151,7 @@ async fn export_by_ids_streams_games() {
     let stream = client(&server)
         .games()
         .export_by_ids(&["a", "b"])
+        .stream()
         .await
         .unwrap();
     let games: Vec<_> = stream.collect().await;
@@ -174,10 +178,16 @@ async fn current_game_returns_game() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/api/user/bobby/current-game"))
+        .and(header("accept", "application/json"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"cur123"}"#))
         .mount(&server)
         .await;
-    let game = client(&server).games().current_game("bobby").await.unwrap();
+    let game = client(&server)
+        .games()
+        .current_game("bobby")
+        .json()
+        .await
+        .unwrap();
     assert_eq!(game.id, "cur123");
 }
 
@@ -211,7 +221,12 @@ async fn export_bookmarks_streams_games() {
         )
         .mount(&server)
         .await;
-    let stream = client(&server).games().export_bookmarks().await.unwrap();
+    let stream = client(&server)
+        .games()
+        .export_bookmarks()
+        .stream()
+        .await
+        .unwrap();
     let games: Vec<_> = stream.collect().await;
     assert_eq!(games.len(), 2);
     assert_eq!(games[0].as_ref().unwrap().id, "b1");
@@ -237,6 +252,7 @@ async fn stream_by_users_streams_games() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/api/stream/games-by-users"))
+        .and(query_param("withCurrentGames", "true"))
         .and(body_string_contains("alice,bob"))
         .respond_with(
             ResponseTemplate::new(200).set_body_string("{\"id\":\"u1\"}\n{\"id\":\"u2\"}\n"),
@@ -245,7 +261,7 @@ async fn stream_by_users_streams_games() {
         .await;
     let stream = client(&server)
         .games()
-        .stream_by_users(&["alice", "bob"])
+        .stream_by_users(&["alice", "bob"], Some(true))
         .await
         .unwrap();
     let games: Vec<_> = stream.collect().await;
@@ -270,6 +286,154 @@ async fn stream_by_ids_streams_games() {
         .unwrap();
     let games: Vec<_> = stream.collect().await;
     assert_eq!(games.len(), 2);
+}
+
+#[tokio::test]
+async fn export_user_games_sends_export_block_and_filters() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/games/user/bobby"))
+        .and(query_param("vs", "magnus"))
+        .and(query_param("analysed", "true"))
+        .and(query_param("finished", "false"))
+        .and(query_param("lastFen", "true"))
+        .and(query_param("withBookmarked", "true"))
+        .and(query_param("sort", "dateAsc"))
+        .and(query_param("clocks", "true"))
+        .and(query_param("accuracy", "true"))
+        .and(query_param("division", "true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{\"id\":\"g1\"}\n"))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server)
+        .games()
+        .export_user("bobby")
+        .vs("magnus")
+        .analysed(true)
+        .finished(false)
+        .last_fen(true)
+        .with_bookmarked(true)
+        .sort(GameSort::DateAsc)
+        .export(
+            GameExportOptions::default()
+                .clocks(true)
+                .accuracy(true)
+                .division(true),
+        )
+        .stream()
+        .await
+        .unwrap();
+    let games: Vec<_> = stream.collect().await;
+    assert_eq!(games.len(), 1);
+}
+
+#[tokio::test]
+async fn export_by_ids_sends_export_options() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/games/export/_ids"))
+        .and(query_param("clocks", "true"))
+        .and(query_param("literate", "true"))
+        .and(body_string_contains("a,b"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{\"id\":\"a\"}\n"))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server)
+        .games()
+        .export_by_ids(&["a", "b"])
+        .export(GameExportOptions::default().clocks(true).literate(true))
+        .stream()
+        .await
+        .unwrap();
+    let games: Vec<_> = stream.collect().await;
+    assert_eq!(games.len(), 1);
+}
+
+#[tokio::test]
+async fn export_bookmarks_sends_filters_and_export() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/games/export/bookmarks"))
+        .and(query_param("max", "5"))
+        .and(query_param("sort", "dateAsc"))
+        .and(query_param("moves", "false"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("{\"id\":\"b1\"}\n"))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server)
+        .games()
+        .export_bookmarks()
+        .max(5)
+        .sort(GameSort::DateAsc)
+        .export(GameExportOptions::default().moves(false))
+        .stream()
+        .await
+        .unwrap();
+    let games: Vec<_> = stream.collect().await;
+    assert_eq!(games.len(), 1);
+}
+
+#[tokio::test]
+async fn export_by_ids_pgn_sets_accept_header() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/games/export/_ids"))
+        .and(header("accept", "application/x-chess-pgn"))
+        .and(body_string_contains("a,b"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"x\"]\n\n1. e4 *"))
+        .mount(&server)
+        .await;
+
+    let pgn = client(&server)
+        .games()
+        .export_by_ids(&["a", "b"])
+        .pgn()
+        .await
+        .unwrap();
+    assert!(pgn.contains("1. e4"));
+}
+
+#[tokio::test]
+async fn export_bookmarks_pgn_sets_accept_header() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/games/export/bookmarks"))
+        .and(header("accept", "application/x-chess-pgn"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"x\"]\n\n1. d4 *"))
+        .mount(&server)
+        .await;
+
+    let pgn = client(&server)
+        .games()
+        .export_bookmarks()
+        .pgn()
+        .await
+        .unwrap();
+    assert!(pgn.contains("1. d4"));
+}
+
+#[tokio::test]
+async fn current_game_pgn_sets_accept_and_export() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/user/bobby/current-game"))
+        .and(header("accept", "application/x-chess-pgn"))
+        .and(query_param("clocks", "true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"x\"]\n\n1. e4 *"))
+        .mount(&server)
+        .await;
+
+    let pgn = client(&server)
+        .games()
+        .current_game("bobby")
+        .export(GameExportOptions::default().clocks(true))
+        .pgn()
+        .await
+        .unwrap();
+    assert!(pgn.contains("1. e4"));
 }
 
 #[tokio::test]

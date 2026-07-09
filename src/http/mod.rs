@@ -10,7 +10,7 @@ use std::fmt::Display;
 
 use futures_util::stream::BoxStream;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
-use reqwest::header::{HeaderMap, HeaderName, LAST_MODIFIED, RETRY_AFTER};
+use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderName, LAST_MODIFIED, RETRY_AFTER};
 use reqwest::{RequestBuilder, Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -24,6 +24,36 @@ use crate::stream::ndjson;
 #[derive(Debug, Deserialize)]
 struct ErrorBody {
     error: String,
+}
+
+/// `Accept` value selecting the newline-delimited JSON representation
+/// (`application/x-ndjson`), shared by the streaming game-export endpoints.
+pub(crate) const ACCEPT_NDJSON: &str = "application/x-ndjson";
+
+/// `Accept` value selecting the PGN representation (`application/x-chess-pgn`),
+/// shared by the game-export endpoints that can return PGN text.
+pub(crate) const ACCEPT_PGN: &str = "application/x-chess-pgn";
+
+/// `Accept` value selecting the JSON representation (`application/json`). The
+/// single-game and current-game exports default to PGN, so JSON is requested
+/// explicitly.
+pub(crate) const ACCEPT_JSON: &str = "application/json";
+
+/// `Content-Type` for `application/x-www-form-urlencoded` request bodies.
+pub(crate) const CONTENT_TYPE_FORM: &str = "application/x-www-form-urlencoded";
+
+/// Joins already-url-encoded form parts into one body, dropping empty parts.
+///
+/// `serde_urlencoded` cannot flatten several structs into a single form, so a
+/// request that carries a core form plus grouped value-types (conditions, info)
+/// serializes each independently and joins the pieces here.
+pub(crate) fn join_form(parts: &[String]) -> String {
+    parts
+        .iter()
+        .filter(|part| !part.is_empty())
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join("&")
 }
 
 /// Characters left literal in a path segment: the RFC 3986 unreserved set
@@ -75,6 +105,31 @@ impl ApiRequest {
     pub(crate) fn form<T: Serialize + ?Sized>(mut self, form: &T) -> Self {
         self.builder = self.builder.form(form);
         self
+    }
+
+    /// Sets an `x-www-form-urlencoded` body from a core form plus a grouped
+    /// value-type, serializing each independently and joining the non-empty
+    /// parts (with the content-type set in one place).
+    ///
+    /// `serde_urlencoded` cannot flatten the grouped value-types (conditions,
+    /// info) into the core struct, so they are encoded separately here. Both
+    /// arguments are flat structs, so serialization cannot fail.
+    pub(crate) fn form_parts<A, B>(self, core: &A, extra: &B) -> Self
+    where
+        A: Serialize + ?Sized,
+        B: Serialize + ?Sized,
+    {
+        let core = serde_urlencoded::to_string(core).unwrap_or_default();
+        let extra = serde_urlencoded::to_string(extra).unwrap_or_default();
+        self.form_body(join_form(&[core, extra]))
+    }
+
+    /// Sets an already-encoded `x-www-form-urlencoded` body and the matching
+    /// content-type. The primitive behind [`form_parts`](Self::form_parts), for
+    /// bodies that combine more than two parts (e.g. flat fields + grouped
+    /// value-types + indexed array keys).
+    pub(crate) fn form_body(self, body: String) -> Self {
+        self.header(CONTENT_TYPE, CONTENT_TYPE_FORM).body(body)
     }
 
     /// Sets a JSON body.
@@ -210,6 +265,15 @@ mod tests {
     fn ignores_non_error_bodies() {
         assert_eq!(error_message(r#"{"ok":true}"#), None);
         assert_eq!(error_message("plain text"), None);
+    }
+
+    #[test]
+    fn join_form_drops_empty_parts() {
+        assert_eq!(join_form(&[]), "");
+        assert_eq!(join_form(&["a=1".to_owned(), String::new()]), "a=1");
+        assert_eq!(join_form(&[String::new(), "b=2".to_owned()]), "b=2");
+        assert_eq!(join_form(&["a=1".to_owned(), "b=2".to_owned()]), "a=1&b=2");
+        assert_eq!(join_form(&[String::new(), String::new()]), "");
     }
 
     #[test]

@@ -11,7 +11,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
-use crate::model::LichessVariantKey;
+use crate::model::{GameExportOptions, LichessVariantKey};
 
 /// Accessor for the Bulk Pairing API.
 #[derive(Debug)]
@@ -61,17 +61,66 @@ impl<'a> BulkPairingApi<'a> {
         http::ok(self.client.request(Method::DELETE, Host::Default, &path)).await
     }
 
-    /// Streams the games of a bulk pairing as NDJSON.
+    /// Starts an export of a bulk pairing's games.
     /// `GET /api/bulk-pairing/{id}/games`
-    pub async fn games(&self, id: &str) -> Result<BoxStream<'static, Result<LichessGame>>> {
-        let path = format!("/api/bulk-pairing/{}/games", http::segment(id));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+    ///
+    /// Finish with [`stream`](BulkGamesRequest::stream) or
+    /// [`pgn`](BulkGamesRequest::pgn).
+    #[must_use]
+    pub fn games(&self, id: &'a str) -> BulkGamesRequest<'a> {
+        BulkGamesRequest::new(self.client, id)
+    }
+}
+
+/// Builder for exporting a bulk pairing's games
+/// (`GET /api/bulk-pairing/{id}/games`).
+#[derive(Debug)]
+pub struct BulkGamesRequest<'a> {
+    client: &'a LichessClient,
+    id: &'a str,
+    export: GameExportOptions,
+}
+
+impl<'a> BulkGamesRequest<'a> {
+    /// Creates the request builder.
+    pub(crate) fn new(client: &'a LichessClient, id: &'a str) -> Self {
+        Self {
+            client,
+            id,
+            export: GameExportOptions::default(),
+        }
+    }
+
+    /// Sets the shared export-format options (moves, clocks, evals, …).
+    #[must_use]
+    pub fn export(mut self, options: GameExportOptions) -> Self {
+        self.export = options;
+        self
+    }
+
+    /// Executes the export, streaming games as decoded JSON values.
+    pub async fn stream(self) -> Result<BoxStream<'static, Result<LichessGame>>> {
+        let request = self.request(http::ACCEPT_NDJSON);
         http::stream(request, self.client.max_line_bytes()).await
+    }
+
+    /// Executes the export, returning all games as one PGN string.
+    pub async fn pgn(self) -> Result<String> {
+        http::text(self.request(http::ACCEPT_PGN)).await
+    }
+
+    /// Builds the request with the given `Accept` representation.
+    fn request(&self, accept: &'static str) -> http::ApiRequest {
+        let path = format!("/api/bulk-pairing/{}/games", http::segment(self.id));
+        self.client
+            .request(Method::GET, Host::Default, &path)
+            .header(reqwest::header::ACCEPT, accept)
+            .query(&self.export)
     }
 }
 
 /// Form body for creating a bulk pairing.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 struct BulkPairingForm<'a> {
     players: &'a str,
     #[serde(rename = "clock.limit", skip_serializing_if = "Option::is_none")]
@@ -86,6 +135,14 @@ struct BulkPairingForm<'a> {
     rated: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     variant: Option<LichessVariantKey>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    days: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fen: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rules: Option<&'a str>,
 }
 
 /// Builder for creating a bulk pairing.
@@ -102,12 +159,7 @@ impl<'a> BulkPairingRequest<'a> {
             client,
             form: BulkPairingForm {
                 players,
-                clock_limit: None,
-                clock_increment: None,
-                pair_at: None,
-                start_clocks_at: None,
-                rated: None,
-                variant: None,
+                ..Default::default()
             },
         }
     }
@@ -145,6 +197,34 @@ impl<'a> BulkPairingRequest<'a> {
     #[must_use]
     pub fn variant(mut self, variant: LichessVariantKey) -> Self {
         self.form.variant = Some(variant);
+        self
+    }
+
+    /// Sets days per turn for correspondence pairings.
+    #[must_use]
+    pub fn days(mut self, days: u32) -> Self {
+        self.form.days = Some(days);
+        self
+    }
+
+    /// Sets a custom starting position (FEN) for all games.
+    #[must_use]
+    pub fn fen(mut self, fen: &'a str) -> Self {
+        self.form.fen = Some(fen);
+        self
+    }
+
+    /// Sets a message sent to all players when their game starts.
+    #[must_use]
+    pub fn message(mut self, message: &'a str) -> Self {
+        self.form.message = Some(message);
+        self
+    }
+
+    /// Sets extra game rules (comma-separated).
+    #[must_use]
+    pub fn rules(mut self, rules: &'a str) -> Self {
+        self.form.rules = Some(rules);
         self
     }
 
