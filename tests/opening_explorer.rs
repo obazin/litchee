@@ -3,7 +3,7 @@
 use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::database::opening_explorer::{ExplorerMode, RatingGroup};
-use litchee::model::{LichessColor, LichessSpeed};
+use litchee::model::{LichessColor, LichessSpeed, LichessVariantKey};
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -129,7 +129,7 @@ async fn lichess_sends_variant_dates_and_history() {
     let result = client(&server)
         .opening_explorer()
         .lichess("startpos")
-        .variant("crazyhouse")
+        .variant(LichessVariantKey::Crazyhouse)
         .since("2015-01")
         .until("2020-12")
         .top_games(4)
@@ -207,7 +207,7 @@ async fn player_sends_speeds_modes_and_recent_games() {
     let stream = client(&server)
         .opening_explorer()
         .player("bobby", LichessColor::Black, "startpos")
-        .variant("standard")
+        .variant(LichessVariantKey::Standard)
         .speeds(&[LichessSpeed::Bullet, LichessSpeed::Blitz])
         .modes(&[ExplorerMode::Rated])
         .recent_games(8)

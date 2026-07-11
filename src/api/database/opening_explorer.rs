@@ -11,7 +11,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
-use crate::model::{LichessColor, LichessSpeed};
+use crate::model::{LichessColor, LichessSpeed, LichessVariantKey};
 
 /// A player-rating band the Lichess games explorer can be filtered to. Each
 /// value is the inclusive lower bound of a 200-point band (`R0` = below 1000,
@@ -128,7 +128,7 @@ struct LichessQuery<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     play: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    variant: Option<&'a str>,
+    variant: Option<LichessVariantKey>,
     #[serde(skip_serializing_if = "Option::is_none")]
     speeds: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -153,7 +153,7 @@ struct PlayerQuery<'a> {
     player: &'a str,
     color: LichessColor,
     #[serde(skip_serializing_if = "Option::is_none")]
-    variant: Option<&'a str>,
+    variant: Option<LichessVariantKey>,
     fen: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     play: Option<&'a str>,
@@ -263,7 +263,7 @@ impl<'a> LichessExplorerRequest<'a> {
 
     /// Chess variant (defaults to standard when unset).
     #[must_use]
-    pub fn variant(mut self, variant: &'a str) -> Self {
+    pub fn variant(mut self, variant: LichessVariantKey) -> Self {
         self.query.variant = Some(variant);
         self
     }
@@ -370,7 +370,7 @@ impl<'a> PlayerExplorerRequest<'a> {
 
     /// Chess variant (defaults to standard when unset).
     #[must_use]
-    pub fn variant(mut self, variant: &'a str) -> Self {
+    pub fn variant(mut self, variant: LichessVariantKey) -> Self {
         self.query.variant = Some(variant);
         self
     }
