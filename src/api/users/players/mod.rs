@@ -394,16 +394,9 @@ impl LichessClient {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct LichessUserStatus {
-    /// The canonical (lowercased) user id.
-    pub id: String,
-    /// The display name.
-    pub name: String,
-    /// The player's title, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<LichessTitle>,
-    /// The player's flair, if set.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub flair: Option<String>,
+    /// The identifying and display fields (id, name, title, flair, patron).
+    #[serde(flatten)]
+    pub user: LichessLightUser,
     /// Whether the user is currently online.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub online: Option<bool>,
@@ -413,12 +406,6 @@ pub struct LichessUserStatus {
     /// Whether the user is currently streaming.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub streaming: Option<bool>,
-    /// Deprecated patron flag; prefer [`patron_color`](Self::patron_color).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub patron: Option<bool>,
-    /// The chosen Patron wing color; its presence marks an active patron.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub patron_color: Option<u8>,
     /// Network signal strength 1–4, only when requested with `withSignal`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signal: Option<u8>,
@@ -485,7 +472,7 @@ mod tests {
     fn parses_user_status_flags() {
         let json = r#"{"id":"bobby","name":"Bobby","online":true,"playing":false}"#;
         let status: LichessUserStatus = serde_json::from_str(json).unwrap();
-        assert_eq!(status.id, "bobby");
+        assert_eq!(status.user.id, "bobby");
         assert_eq!(status.online, Some(true));
         assert_eq!(status.playing, Some(false));
         assert_eq!(status.streaming, None);

@@ -46,7 +46,7 @@ async fn users_status() {
         .statuses(&[STABLE_USER], None, None, None)
         .await
         .expect("fetch user status");
-    assert_eq!(statuses.first().expect("one status").id, STABLE_USER);
+    assert_eq!(statuses.first().expect("one status").user.id, STABLE_USER);
 }
 
 #[tokio::test]
