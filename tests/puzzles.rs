@@ -159,10 +159,37 @@ async fn dashboard_and_storm() {
     let sols = [LichessPuzzleSolution::new("p1", true)];
     let batch = client(&server)
         .puzzles()
-        .solve_batch("mix", &sols)
+        .solve_batch("mix", &sols, 0)
         .await
         .unwrap();
     assert!(batch.puzzles.is_empty());
+}
+
+#[tokio::test]
+async fn solve_batch_sends_nb_and_decodes_rounds() {
+    use litchee::api::training::puzzles::LichessPuzzleSolution;
+    let server = MockServer::start().await;
+    let body = format!(
+        r#"{{"puzzles":[{PUZZLE}],
+             "rounds":[{{"id":"p1","win":true,"ratingDiff":7}}]}}"#
+    );
+    Mock::given(method("POST"))
+        .and(path("/api/puzzle/batch/mix"))
+        .and(query_param("nb", "3"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let sols = [LichessPuzzleSolution::new("p1", true)];
+    let resp = client(&server)
+        .puzzles()
+        .solve_batch("mix", &sols, 3)
+        .await
+        .unwrap();
+
+    assert_eq!(resp.puzzles.len(), 1);
+    assert_eq!(resp.rounds.len(), 1);
+    assert_eq!(resp.rounds[0].rating_diff, Some(7));
 }
 
 #[tokio::test]

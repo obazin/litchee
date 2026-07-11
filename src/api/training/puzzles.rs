@@ -122,21 +122,25 @@ impl<'a> PuzzlesApi<'a> {
         http::json(request, "LichessPuzzleBatch").await
     }
 
-    /// Submits puzzle solutions and gets the next batch.
+    /// Submits puzzle solutions and updates ratings.
     ///
+    /// When `nb` > 0, the response also carries a fresh batch of `nb` puzzles
+    /// (equivalent to calling [`batch`](Self::batch)); pass `0` to skip it.
     /// `POST /api/puzzle/batch/{angle}`
     pub async fn solve_batch(
         &self,
         angle: &str,
         solutions: &[LichessPuzzleSolution],
-    ) -> Result<LichessPuzzleBatch> {
+        nb: u32,
+    ) -> Result<LichessPuzzleSolveResponse> {
         let path = format!("/api/puzzle/batch/{}", http::segment(angle));
         let body = serde_json::json!({ "solutions": solutions });
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
+            .query(&[("nb", nb.to_string())])
             .json(&body);
-        http::json(request, "LichessPuzzleBatch").await
+        http::json(request, "LichessPuzzleSolveResponse").await
     }
 
     /// Gets the authenticated user's puzzle dashboard for the last `days` days.
@@ -360,6 +364,39 @@ pub struct LichessPuzzleBatch {
     /// The user's puzzle Glicko rating, if present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub glicko: Option<Value>,
+}
+
+/// One solved-puzzle round in a batch-solve response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct LichessPuzzleRound {
+    /// The puzzle id.
+    pub id: String,
+    /// Whether it was solved correctly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub win: Option<bool>,
+    /// The rating change resulting from the attempt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rating_diff: Option<i32>,
+}
+
+/// The response to submitting a batch of solutions. `POST /api/puzzle/batch/{angle}`.
+///
+/// Distinct from [`LichessPuzzleBatch`] (the `GET` select response): it adds the
+/// solved `rounds`, and `puzzles` is only populated when `nb` > 0 was requested.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessPuzzleSolveResponse {
+    /// The fresh puzzle batch, present only when `nb` > 0 was requested.
+    #[serde(default)]
+    pub puzzles: Vec<LichessPuzzleAndGame>,
+    /// The user's puzzle Glicko rating, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub glicko: Option<Value>,
+    /// The submitted solutions with their outcomes.
+    #[serde(default)]
+    pub rounds: Vec<LichessPuzzleRound>,
 }
 
 /// A solution submitted for a puzzle in a batch.
