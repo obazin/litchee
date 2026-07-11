@@ -228,7 +228,15 @@ async fn write_note_posts_text() {
 #[tokio::test]
 async fn perf_stats_returns_stats() {
     let server = MockServer::start().await;
-    let body = r#"{"rank":42,"percentile":98.5,"perf":{"nb":1000,"progress":12}}"#;
+    let body = r#"{"rank":42,"percentile":98.5,"perf":{"nb":1000,"progress":12},
+        "stat":{
+            "highest":{"int":2100,"at":"2023-01-01T00:00:00Z","gameId":"g1"},
+            "count":{"all":1000,"win":600,"loss":300,"draw":100,"opAvg":1850.5,"seconds":123456},
+            "bestWins":{"results":[{"opRating":2200,"opId":{"id":"x","name":"X"},
+                "at":"2023-02-01T00:00:00Z","gameId":"g2"}]},
+            "resultStreak":{"win":{"cur":{"v":3},"max":{"v":9,
+                "from":{"at":"2023-03-01T00:00:00Z","gameId":"g3"}}}}
+        }}"#;
     Mock::given(method("GET"))
         .and(path("/api/user/bobby/perf/blitz"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
@@ -240,19 +248,58 @@ async fn perf_stats_returns_stats() {
         .await
         .unwrap();
     assert_eq!(stats.rank, Some(42));
+    let stat = stats.stat.unwrap();
+    assert_eq!(stat.highest.unwrap().int, Some(2100));
+    assert_eq!(stat.count.unwrap().op_avg, Some(1850.5));
+    assert_eq!(
+        stat.best_wins.unwrap().results[0]
+            .op_id
+            .as_ref()
+            .unwrap()
+            .name,
+        "X"
+    );
+    assert_eq!(
+        stat.result_streak.unwrap().win.unwrap().max.unwrap().v,
+        Some(9)
+    );
 }
 
 #[tokio::test]
 async fn activity_returns_entries() {
     let server = MockServer::start().await;
-    let body = r#"[{"interval":{"start":1700000000000,"end":1700086400000}}]"#;
+    let body = r#"[{"interval":{"start":1700000000000,"end":1700086400000},
+        "games":{"blitz":{"win":5,"loss":2,"draw":1,"rp":{"before":1800,"after":1815}}},
+        "puzzles":{"score":{"win":10,"loss":3,"draw":0,"rp":{"before":2000,"after":2020}}},
+        "tournaments":{"nb":2,"best":[{"tournament":{"id":"t1","name":"Weekly"},
+            "nbGames":7,"score":15,"rank":3,"rankPercent":10}]},
+        "follows":{"in":{"ids":["a"]}}}]"#;
     Mock::given(method("GET"))
         .and(path("/api/user/bobby/activity"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
     let activity = client(&server).users().activity("bobby").await.unwrap();
-    assert_eq!(activity[0].interval.start, 1_700_000_000_000);
+    let day = &activity[0];
+    assert_eq!(day.interval.start, 1_700_000_000_000);
+    assert_eq!(day.games.as_ref().unwrap()["blitz"].win, Some(5));
+    assert_eq!(
+        day.puzzles
+            .as_ref()
+            .unwrap()
+            .score
+            .as_ref()
+            .unwrap()
+            .rp
+            .unwrap()
+            .after,
+        Some(2020)
+    );
+    assert_eq!(
+        day.tournaments.as_ref().unwrap().best[0].rank_percent,
+        Some(10)
+    );
+    assert!(day.other.contains_key("follows"));
 }
 
 #[tokio::test]

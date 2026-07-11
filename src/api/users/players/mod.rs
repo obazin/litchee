@@ -14,6 +14,21 @@ use crate::error::Result;
 use crate::http;
 use crate::model::{LichessLightUser, LichessTitle, LichessUser, LichessUserExtended};
 
+mod activity;
+mod perf_stat;
+
+pub use activity::{
+    LichessActivity, LichessActivityInterval, LichessActivityPuzzles, LichessActivityScore,
+    LichessActivityScoreProgress, LichessActivityTournament, LichessActivityTournamentResult,
+    LichessActivityTournaments,
+};
+pub use perf_stat::{
+    LichessPerfStat, LichessPerfStatCount, LichessPerfStatDetails, LichessPerfStatPerf,
+    LichessPerfStatPlayStreak, LichessPerfStatRatingAt, LichessPerfStatResult,
+    LichessPerfStatResultStreak, LichessPerfStatResults, LichessPerfStatStreak,
+    LichessPerfStatStreakSpan, LichessPerfStatStreakStamp,
+};
+
 /// Accessor for the Users API.
 #[derive(Debug)]
 pub struct UsersApi<'a> {
@@ -574,62 +589,6 @@ pub struct LichessGlicko {
     /// Whether the rating is provisional.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provisional: Option<bool>,
-}
-
-/// The rating part of a [`LichessPerfStat`].
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub struct LichessPerfStatPerf {
-    /// The Glicko-2 rating.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub glicko: Option<LichessGlicko>,
-    /// Number of games played.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nb: Option<u32>,
-    /// Recent progress.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub progress: Option<i32>,
-}
-
-/// Statistics for one of a user's perfs. `GET /api/user/{username}/perf/{perf}`
-///
-/// Models the headline fields; the detailed `stat` aggregate is not decoded.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub struct LichessPerfStat {
-    /// The user's percentile within this perf.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub percentile: Option<f64>,
-    /// The user's rank within this perf.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rank: Option<u32>,
-    /// The user.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub user: Option<LichessLightUser>,
-    /// The rating details.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub perf: Option<LichessPerfStatPerf>,
-}
-
-/// The time range of a [`LichessActivity`] entry.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub struct LichessActivityInterval {
-    /// Start time (Unix milliseconds).
-    pub start: i64,
-    /// End time (Unix milliseconds).
-    pub end: i64,
-}
-
-/// One day of a user's activity. `GET /api/user/{username}/activity`
-///
-/// Models the time interval; the per-category activity payloads vary widely and
-/// are not all decoded.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub struct LichessActivity {
-    /// The time range this entry covers.
-    pub interval: LichessActivityInterval,
 }
 
 /// The stream details of a [`LichessLiveStreamer`].
