@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use reqwest::Method;
-use reqwest::header::{ACCEPT, CONTENT_TYPE};
+use reqwest::header::ACCEPT;
 use serde::{Deserialize, Serialize};
 
 use crate::client::LichessClient;
@@ -70,8 +70,7 @@ impl<'a> UsersApi<'a> {
             .client
             .request(Method::POST, Host::Default, "/api/users")
             .query(&[("profile", profile), ("rank", rank)])
-            .header(CONTENT_TYPE, "text/plain")
-            .body(ids.join(","));
+            .text_body(ids.join(","));
         http::json(request, "Vec<LichessUser>").await
     }
 

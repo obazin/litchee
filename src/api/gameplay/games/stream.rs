@@ -2,7 +2,7 @@
 
 use futures_util::stream::BoxStream;
 use reqwest::Method;
-use reqwest::header::{ACCEPT, CONTENT_TYPE};
+use reqwest::header::ACCEPT;
 
 use super::GamesApi;
 use super::model::{LichessGame, LichessGameMoveUpdate};
@@ -45,8 +45,7 @@ impl GamesApi<'_> {
             .client
             .request(Method::POST, Host::Default, "/api/stream/games-by-users")
             .query(&[("withCurrentGames", with_current_games)])
-            .header(CONTENT_TYPE, "text/plain")
-            .body(usernames.join(","));
+            .text_body(usernames.join(","));
         http::stream(request, self.client.max_line_bytes()).await
     }
 
@@ -61,8 +60,7 @@ impl GamesApi<'_> {
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .header(CONTENT_TYPE, "text/plain")
-            .body(ids.join(","));
+            .text_body(ids.join(","));
         http::stream(request, self.client.max_line_bytes()).await
     }
 
@@ -73,8 +71,7 @@ impl GamesApi<'_> {
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .header(CONTENT_TYPE, "text/plain")
-            .body(ids.join(","));
+            .text_body(ids.join(","));
         http::ok(request).await
     }
 }

@@ -4,7 +4,6 @@
 //! endpoints are served from `engine.lichess.ovh`.
 
 use futures_util::stream::BoxStream;
-use reqwest::header::CONTENT_TYPE;
 use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -123,8 +122,7 @@ impl<'a> ExternalEngineApi<'a> {
         let request = self
             .client
             .request(Method::POST, Host::Engine, &path)
-            .header(CONTENT_TYPE, "text/plain")
-            .body(output.to_owned());
+            .text_body(output.to_owned());
         http::ok(request).await
     }
 }

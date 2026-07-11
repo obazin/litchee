@@ -42,6 +42,10 @@ pub(crate) const ACCEPT_JSON: &str = "application/json";
 /// `Content-Type` for `application/x-www-form-urlencoded` request bodies.
 pub(crate) const CONTENT_TYPE_FORM: &str = "application/x-www-form-urlencoded";
 
+/// `Content-Type` for `text/plain` request bodies (PGN, comma-joined id lists,
+/// engine output, …).
+pub(crate) const CONTENT_TYPE_PLAIN: &str = "text/plain";
+
 /// Joins already-url-encoded form parts into one body, dropping empty parts.
 ///
 /// `serde_urlencoded` cannot flatten several structs into a single form, so a
@@ -142,6 +146,12 @@ impl ApiRequest {
     pub(crate) fn body(mut self, body: impl Into<reqwest::Body>) -> Self {
         self.builder = self.builder.body(body);
         self
+    }
+
+    /// Sets a `text/plain` body and the matching content-type, centralizing the
+    /// literal for the endpoints that post raw text (PGN, id lists, engine output).
+    pub(crate) fn text_body(self, body: impl Into<reqwest::Body>) -> Self {
+        self.header(CONTENT_TYPE, CONTENT_TYPE_PLAIN).body(body)
     }
 
     /// Sends the request, retrying `429` responses per the policy. Returns the

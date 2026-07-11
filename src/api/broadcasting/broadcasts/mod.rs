@@ -4,7 +4,6 @@
 
 use futures_util::stream::BoxStream;
 use reqwest::Method;
-use reqwest::header::CONTENT_TYPE;
 use serde::Serialize;
 
 use crate::client::LichessClient;
@@ -203,8 +202,7 @@ impl<'a> BroadcastsApi<'a> {
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .header(CONTENT_TYPE, "text/plain")
-            .body(pgn.to_owned());
+            .text_body(pgn.to_owned());
         http::json(request, "LichessBroadcastPushResult").await
     }
 

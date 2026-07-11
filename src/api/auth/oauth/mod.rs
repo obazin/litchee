@@ -188,8 +188,7 @@ impl<'a> OauthApi<'a> {
         let request = self
             .client
             .request(Method::POST, Host::Default, "/api/token/test")
-            .header(reqwest::header::CONTENT_TYPE, "text/plain")
-            .body(tokens.join(","));
+            .text_body(tokens.join(","));
         http::json(request, "token test results").await
     }
 }

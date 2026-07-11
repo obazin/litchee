@@ -3,7 +3,7 @@
 
 use futures_util::stream::BoxStream;
 use reqwest::Method;
-use reqwest::header::{ACCEPT, CONTENT_TYPE};
+use reqwest::header::ACCEPT;
 use serde::Serialize;
 
 use super::model::LichessGame;
@@ -296,9 +296,8 @@ impl<'a> ExportByIdsRequest<'a> {
             .client
             .request(Method::POST, Host::Default, "/api/games/export/_ids")
             .header(ACCEPT, ACCEPT_NDJSON)
-            .header(CONTENT_TYPE, "text/plain")
             .query(&self.export)
-            .body(self.ids);
+            .text_body(self.ids);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
@@ -308,9 +307,8 @@ impl<'a> ExportByIdsRequest<'a> {
             .client
             .request(Method::POST, Host::Default, "/api/games/export/_ids")
             .header(ACCEPT, ACCEPT_PGN)
-            .header(CONTENT_TYPE, "text/plain")
             .query(&self.export)
-            .body(self.ids);
+            .text_body(self.ids);
         http::text(request).await
     }
 }
