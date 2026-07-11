@@ -2,6 +2,7 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
+use litchee::model::LichessColor;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -109,7 +110,7 @@ async fn batch_returns_puzzles() {
         .await;
     let batch = client(&server)
         .puzzles()
-        .batch("mix", 5, Some("hardest"), Some("white"))
+        .batch("mix", 5, Some("hardest"), Some(LichessColor::White))
         .await
         .unwrap();
     assert_eq!(batch.puzzles.len(), 1);

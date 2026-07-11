@@ -29,7 +29,7 @@ struct NextQuery<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     difficulty: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    color: Option<&'a str>,
+    color: Option<LichessColor>,
 }
 
 /// Query parameters for puzzle activity.
@@ -71,7 +71,7 @@ impl<'a> PuzzlesApi<'a> {
         &self,
         angle: Option<&str>,
         difficulty: Option<&str>,
-        color: Option<&str>,
+        color: Option<LichessColor>,
     ) -> Result<LichessPuzzleAndGame> {
         let query = NextQuery {
             angle,
@@ -111,14 +111,15 @@ impl<'a> PuzzlesApi<'a> {
         angle: &str,
         nb: u32,
         difficulty: Option<&str>,
-        color: Option<&str>,
+        color: Option<LichessColor>,
     ) -> Result<LichessPuzzleBatch> {
         let path = format!("/api/puzzle/batch/{}", http::segment(angle));
         let request = self
             .client
             .request(Method::GET, Host::Default, &path)
-            .query(&[("nb", nb.to_string())])
-            .query(&[("difficulty", difficulty), ("color", color)]);
+            .query(&[("nb", nb)])
+            .query(&[("difficulty", difficulty)])
+            .query(&[("color", color)]);
         http::json(request, "LichessPuzzleBatch").await
     }
 
