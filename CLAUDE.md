@@ -141,11 +141,13 @@ names** (types, methods, modules). Borrow concepts, not code or identifiers.
 ---
 
 ## Common commands
-The Rust toolchain comes from the Nix dev shell defined in `flake.nix`
-(`chess-flake`'s `rustShell`). Run commands inside it:
+The Rust toolchain comes from this project's **standalone** Nix dev shell in
+`flake.nix` (a `fenix` toolchain pinned to `rust-toolchain.toml`; it does **not**
+consume `chess-flake`). Run commands inside it:
 ```bash
 nix develop --command cargo build          # or: direnv allow, then plain cargo
 cargo test                 # unit + integration tests
+cargo nextest run          # same suite via the nextest runner (also in the shell)
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt
 git submodule update --init --recursive   # fetch the vendored API spec
