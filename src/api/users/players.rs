@@ -239,6 +239,10 @@ impl UserQuery {
 struct AutocompleteQuery<'a> {
     term: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
+    exists: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    object: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     names: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     friend: Option<bool>,
@@ -254,9 +258,9 @@ struct AutocompleteQuery<'a> {
 
 /// Builder for the username autocomplete (`GET /api/player/autocomplete`).
 ///
-/// Always returns the array-of-usernames form; the spec's `object=true` and
-/// `exists=true` modes (which change the response shape to an object and a bare
-/// boolean respectively) are not modeled.
+/// [`send`](Self::send) returns matching usernames. The spec's response-shape
+/// variants are exposed as distinct terminals: [`exists`](Self::exists) returns
+/// a bare boolean and [`objects`](Self::objects) returns full user objects.
 #[derive(Debug)]
 pub struct AutocompleteRequest<'a> {
     client: &'a LichessClient,
@@ -325,6 +329,47 @@ impl<'a> AutocompleteRequest<'a> {
             .query(&self.query);
         http::json(request, "Vec<String>").await
     }
+
+    /// Checks only whether a user with this exact term exists (`exists=true`).
+    pub async fn exists(mut self) -> Result<bool> {
+        self.query.exists = Some(true);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, "/api/player/autocomplete")
+            .query(&self.query);
+        http::json(request, "bool").await
+    }
+
+    /// Executes the autocomplete, returning full user objects (`object=true`).
+    pub async fn objects(mut self) -> Result<Vec<LichessLightUserOnline>> {
+        self.query.object = Some(true);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, "/api/player/autocomplete")
+            .query(&self.query);
+        let response: AutocompleteObjectResponse =
+            http::json(request, "autocomplete result").await?;
+        Ok(response.result)
+    }
+}
+
+/// A user reference with online status, returned by the object-form autocomplete.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessLightUserOnline {
+    /// The identifying/display fields.
+    #[serde(flatten)]
+    pub user: LichessLightUser,
+    /// Whether the user is currently online.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub online: Option<bool>,
+}
+
+/// Wrapper for the `object=true` autocomplete response (`{ "result": [...] }`).
+#[derive(Debug, Deserialize)]
+struct AutocompleteObjectResponse {
+    #[serde(default)]
+    result: Vec<LichessLightUserOnline>,
 }
 
 impl LichessClient {

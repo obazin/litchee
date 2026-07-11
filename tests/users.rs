@@ -122,6 +122,50 @@ async fn autocomplete_returns_usernames() {
 }
 
 #[tokio::test]
+async fn autocomplete_exists_returns_bool() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/player/autocomplete"))
+        .and(query_param("term", "bobby"))
+        .and(query_param("exists", "true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("true"))
+        .mount(&server)
+        .await;
+
+    let exists = client(&server)
+        .users()
+        .autocomplete("bobby")
+        .exists()
+        .await
+        .unwrap();
+
+    assert!(exists);
+}
+
+#[tokio::test]
+async fn autocomplete_objects_returns_users() {
+    let server = MockServer::start().await;
+    let body = r#"{"result":[{"id":"bobby","name":"Bobby","online":true}]}"#;
+    Mock::given(method("GET"))
+        .and(path("/api/player/autocomplete"))
+        .and(query_param("term", "bob"))
+        .and(query_param("object", "true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let users = client(&server)
+        .users()
+        .autocomplete("bob")
+        .objects()
+        .await
+        .unwrap();
+
+    assert_eq!(users[0].user.name, "Bobby");
+    assert_eq!(users[0].online, Some(true));
+}
+
+#[tokio::test]
 async fn rating_history_returns_entries() {
     let server = MockServer::start().await;
     let body = r#"[{"name":"Bullet","points":[[2011,0,8,1472]]}]"#;
