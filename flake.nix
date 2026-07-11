@@ -41,6 +41,8 @@
             # native library with CMake; pkg-config is needed by some -sys deps.
             pkgs.cmake
             pkgs.pkg-config
+            # Faster, nicer test runner than `cargo test` for the integration suite.
+            pkgs.cargo-nextest
             # Release automation driven by `just` (see justfile):
             # git-cliff generates the changelog, cargo-edit bumps the version,
             # and gh publishes the GitHub release.
