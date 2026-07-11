@@ -25,6 +25,32 @@ fn map_unauthorized_edit(err: LichessError) -> LichessError {
     }
 }
 
+/// The interval between Swiss rounds.
+///
+/// Serializes to the wire integer the spec expects, including the two sentinel
+/// values that a plain seconds count cannot express.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(into = "i32")]
+#[non_exhaustive]
+pub enum SwissRoundInterval {
+    /// Let Lichess pick a sensible value automatically (wire `-1`).
+    Auto,
+    /// Schedule each round manually from the tournament UI (wire `99999999`).
+    Manual,
+    /// A fixed number of seconds between rounds.
+    Seconds(u32),
+}
+
+impl From<SwissRoundInterval> for i32 {
+    fn from(interval: SwissRoundInterval) -> Self {
+        match interval {
+            SwissRoundInterval::Auto => -1,
+            SwissRoundInterval::Manual => 99_999_999,
+            SwissRoundInterval::Seconds(seconds) => i32::try_from(seconds).unwrap_or(i32::MAX),
+        }
+    }
+}
+
 /// Form body for creating a swiss tournament (flat, non-`conditions` fields).
 #[derive(Debug, Default, Serialize)]
 struct CreateForm<'a> {
@@ -39,7 +65,7 @@ struct CreateForm<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     rated: Option<bool>,
     #[serde(rename = "roundInterval", skip_serializing_if = "Option::is_none")]
-    round_interval: Option<u32>,
+    round_interval: Option<SwissRoundInterval>,
     #[serde(rename = "startsAt", skip_serializing_if = "Option::is_none")]
     starts_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -302,10 +328,13 @@ impl<'a> CreateSwissRequest<'a> {
         self
     }
 
-    /// Sets the interval between rounds, in seconds.
+    /// Sets the interval between rounds.
+    ///
+    /// Use [`SwissRoundInterval::Seconds`] for a fixed gap, or `Auto`/`Manual`
+    /// for the spec's sentinel values.
     #[must_use]
-    pub fn round_interval(mut self, seconds: u32) -> Self {
-        self.form.round_interval = Some(seconds);
+    pub fn round_interval(mut self, interval: SwissRoundInterval) -> Self {
+        self.form.round_interval = Some(interval);
         self
     }
 
@@ -614,5 +643,18 @@ mod tests {
             serde_urlencoded::to_string(SwissConditions::default()).unwrap(),
             ""
         );
+    }
+
+    #[test]
+    fn round_interval_serializes_sentinels_and_seconds() {
+        let cases = [
+            (SwissRoundInterval::Auto, "roundInterval=-1"),
+            (SwissRoundInterval::Manual, "roundInterval=99999999"),
+            (SwissRoundInterval::Seconds(60), "roundInterval=60"),
+        ];
+        for (interval, expected) in cases {
+            let form = serde_urlencoded::to_string([("roundInterval", interval)]).unwrap();
+            assert_eq!(form, expected);
+        }
     }
 }
