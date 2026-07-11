@@ -3,7 +3,7 @@
 use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::training::studies::StudyChapterMode;
-use litchee::model::PgnExportOptions;
+use litchee::model::{LichessColor, PgnExportOptions};
 use wiremock::matchers::{body_string_contains, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -142,7 +142,7 @@ async fn import_pgn_posts_name_and_pgn() {
     let result = client(&server)
         .studies()
         .import_pgn("WTvnkWAL", "Game 1", "1. e4 e5 *")
-        .orientation("white")
+        .orientation(LichessColor::White)
         .mode(StudyChapterMode::Gamebook)
         .send()
         .await
@@ -183,7 +183,7 @@ async fn create_study_returns_id() {
         .create_study("My Study")
         .visibility("private")
         .cloneable("nobody")
-        .sticky("false")
+        .sticky(false)
         .send()
         .await
         .unwrap();

@@ -10,7 +10,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
-use crate::model::PgnExportOptions;
+use crate::model::{LichessColor, LichessVariantKey, PgnExportOptions};
 
 /// Analysis mode applied to chapters imported into a study.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -31,9 +31,9 @@ struct ImportForm<'a> {
     name: &'a str,
     pgn: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
-    orientation: Option<&'a str>,
+    orientation: Option<LichessColor>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    variant: Option<&'a str>,
+    variant: Option<LichessVariantKey>,
     #[serde(skip_serializing_if = "Option::is_none")]
     mode: Option<StudyChapterMode>,
 }
@@ -210,7 +210,7 @@ struct CreateStudyForm<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     chat: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    sticky: Option<&'a str>,
+    sticky: Option<bool>,
 }
 
 /// Builder for creating a study.
@@ -274,9 +274,9 @@ impl<'a> CreateStudyRequest<'a> {
         self
     }
 
-    /// Sets whether everyone stays on the same chapter/position (`true`/`false`).
+    /// Sets whether everyone stays on the same chapter/position.
     #[must_use]
-    pub fn sticky(mut self, sticky: &'a str) -> Self {
+    pub fn sticky(mut self, sticky: bool) -> Self {
         self.form.sticky = Some(sticky);
         self
     }
@@ -316,16 +316,16 @@ impl<'a> ImportPgnRequest<'a> {
         }
     }
 
-    /// Sets the board orientation (`white` or `black`).
+    /// Sets the board orientation.
     #[must_use]
-    pub fn orientation(mut self, orientation: &'a str) -> Self {
+    pub fn orientation(mut self, orientation: LichessColor) -> Self {
         self.form.orientation = Some(orientation);
         self
     }
 
     /// Sets the variant.
     #[must_use]
-    pub fn variant(mut self, variant: &'a str) -> Self {
+    pub fn variant(mut self, variant: LichessVariantKey) -> Self {
         self.form.variant = Some(variant);
         self
     }
