@@ -3,7 +3,9 @@
 use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::Secret;
-use litchee::api::engine::external_engine::LichessExternalEngineRegistration;
+use litchee::api::engine::external_engine::{
+    LichessExternalEngineRegistration, LichessExternalEngineWork,
+};
 use wiremock::matchers::{body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -84,6 +86,8 @@ async fn analyse_streams_output() {
     );
     Mock::given(method("POST"))
         .and(path("/api/external-engine/eng/analyse"))
+        .and(body_string_contains("\"sessionId\":\"s\""))
+        .and(body_string_contains("\"movetime\":500"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
@@ -92,7 +96,12 @@ async fn analyse_streams_output() {
         .token("t")
         .build()
         .unwrap();
-    let work = serde_json::json!({"sessionId":"s","threads":1});
+    let work = LichessExternalEngineWork {
+        session_id: "s".to_owned(),
+        threads: 1,
+        movetime: Some(500),
+        ..Default::default()
+    };
     let stream = client
         .external_engine()
         .analyse("eng", "client-secret", &work)

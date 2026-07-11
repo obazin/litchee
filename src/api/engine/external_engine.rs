@@ -83,7 +83,7 @@ impl<'a> ExternalEngineApi<'a> {
         &self,
         id: &str,
         client_secret: &str,
-        work: &Value,
+        work: &LichessExternalEngineWork,
     ) -> Result<BoxStream<'static, Result<Value>>> {
         let path = format!("/api/external-engine/{}/analyse", http::segment(id));
         let body = serde_json::json!({ "clientSecret": client_secret, "work": work });
@@ -248,6 +248,42 @@ mod tests {
         assert!(!json.contains("variants"));
         assert!(!json.contains("providerData"));
     }
+}
+
+/// A unit of analysis work to request from an external engine.
+///
+/// This is a request input, so it is constructible by callers (use
+/// `..Default::default()` for the optional fields). Set exactly one of
+/// `movetime`, `depth`, or `nodes` as the search limit.
+///
+/// `POST /api/external-engine/{id}/analyse`
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LichessExternalEngineWork {
+    /// Identifies the analysis session; providers may clear the hash between sessions.
+    pub session_id: String,
+    /// Number of threads to use for analysis.
+    pub threads: u32,
+    /// Hash table size to use, in MiB.
+    pub hash: u32,
+    /// Requested number of principal variations (1–5).
+    pub multi_pv: u32,
+    /// UCI variant name.
+    pub variant: String,
+    /// Initial position of the game (FEN).
+    pub initial_fen: String,
+    /// Moves played from the initial position, in UCI notation.
+    #[serde(default)]
+    pub moves: Vec<String>,
+    /// Search limit: analyse the position for this many milliseconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub movetime: Option<u32>,
+    /// Search limit: analyse the position to this depth.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub depth: Option<u32>,
+    /// Search limit: analyse this many nodes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nodes: Option<u64>,
 }
 
 /// A unit of analysis work acquired by an engine provider.
