@@ -3,6 +3,7 @@
 use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::gameplay::challenges::LichessChallengeColor;
+use litchee::model::LichessColor;
 use wiremock::matchers::{
     body_string_contains, header, method, path, query_param, query_param_is_missing,
 };
@@ -116,7 +117,7 @@ async fn accept_posts_to_accept_path() {
 
     client(&server)
         .challenges()
-        .accept("abc", Some("white"))
+        .accept("abc", Some(LichessColor::White))
         .await
         .unwrap();
 }

@@ -62,7 +62,7 @@ impl<'a> ChallengesApi<'a> {
     ///
     /// `color` picks a side, valid only for open challenges.
     /// `POST /api/challenge/{challengeId}/accept`
-    pub async fn accept(&self, challenge_id: &str, color: Option<&str>) -> Result<()> {
+    pub async fn accept(&self, challenge_id: &str, color: Option<LichessColor>) -> Result<()> {
         let path = format!("/api/challenge/{}/accept", http::segment(challenge_id));
         let request = self
             .client
