@@ -618,36 +618,6 @@ struct RoundForm<'a> {
     status: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rated: Option<bool>,
-    #[serde(
-        rename = "customScoring.white.win",
-        skip_serializing_if = "Option::is_none"
-    )]
-    custom_scoring_white_win: Option<f64>,
-    #[serde(
-        rename = "customScoring.white.draw",
-        skip_serializing_if = "Option::is_none"
-    )]
-    custom_scoring_white_draw: Option<f64>,
-    #[serde(
-        rename = "customScoring.black.win",
-        skip_serializing_if = "Option::is_none"
-    )]
-    custom_scoring_black_win: Option<f64>,
-    #[serde(
-        rename = "customScoring.black.draw",
-        skip_serializing_if = "Option::is_none"
-    )]
-    custom_scoring_black_draw: Option<f64>,
-    #[serde(
-        rename = "teamCustomScoring.win",
-        skip_serializing_if = "Option::is_none"
-    )]
-    team_custom_scoring_win: Option<f64>,
-    #[serde(
-        rename = "teamCustomScoring.draw",
-        skip_serializing_if = "Option::is_none"
-    )]
-    team_custom_scoring_draw: Option<f64>,
 }
 
 /// Points awarded for a win and a draw (each `0.0`–`10.0`).
@@ -661,6 +631,14 @@ pub struct BroadcastCustomPoints {
     pub draw: f64,
 }
 
+impl BroadcastCustomPoints {
+    /// Appends the `{prefix}.win` / `{prefix}.draw` form pairs.
+    fn append_pairs(self, prefix: &str, out: &mut Vec<(String, String)>) {
+        out.push((format!("{prefix}.win"), self.win.to_string()));
+        out.push((format!("{prefix}.draw"), self.draw.to_string()));
+    }
+}
+
 /// Scoring overrides for both colors of a broadcast round.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BroadcastCustomScoring {
@@ -668,6 +646,14 @@ pub struct BroadcastCustomScoring {
     pub white: BroadcastCustomPoints,
     /// Points awarded when Black wins or draws.
     pub black: BroadcastCustomPoints,
+}
+
+impl BroadcastCustomScoring {
+    /// Appends the `customScoring.{color}.{win,draw}` form pairs.
+    fn append_pairs(self, out: &mut Vec<(String, String)>) {
+        self.white.append_pairs("customScoring.white", out);
+        self.black.append_pairs("customScoring.black", out);
+    }
 }
 
 /// Builder for creating a round (under a tournament) or editing a round.
@@ -679,6 +665,8 @@ pub struct RoundRequest<'a> {
     edit: bool,
     patch: Option<bool>,
     form: RoundForm<'a>,
+    custom_scoring: Option<BroadcastCustomScoring>,
+    team_custom_scoring: Option<BroadcastCustomPoints>,
 }
 
 impl<'a> RoundRequest<'a> {
@@ -698,6 +686,8 @@ impl<'a> RoundRequest<'a> {
                 name,
                 ..Default::default()
             },
+            custom_scoring: None,
+            team_custom_scoring: None,
         }
     }
 
@@ -795,18 +785,14 @@ impl<'a> RoundRequest<'a> {
     /// Overrides the points awarded for wins and draws, per color.
     #[must_use]
     pub fn custom_scoring(mut self, scoring: BroadcastCustomScoring) -> Self {
-        self.form.custom_scoring_white_win = Some(scoring.white.win);
-        self.form.custom_scoring_white_draw = Some(scoring.white.draw);
-        self.form.custom_scoring_black_win = Some(scoring.black.win);
-        self.form.custom_scoring_black_draw = Some(scoring.black.draw);
+        self.custom_scoring = Some(scoring);
         self
     }
 
     /// Overrides the points awarded for a team-match win or draw.
     #[must_use]
     pub fn team_custom_scoring(mut self, scoring: BroadcastCustomPoints) -> Self {
-        self.form.team_custom_scoring_win = Some(scoring.win);
-        self.form.team_custom_scoring_draw = Some(scoring.draw);
+        self.team_custom_scoring = Some(scoring);
         self
     }
 
@@ -825,12 +811,27 @@ impl<'a> RoundRequest<'a> {
         } else {
             format!("/broadcast/{}/new", http::segment(self.target_id))
         };
+        let core = serde_urlencoded::to_string(&self.form).unwrap_or_default();
+        let scoring = serde_urlencoded::to_string(self.scoring_pairs()).unwrap_or_default();
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
             .query(&[("patch", self.patch)])
-            .form(&self.form);
+            .form_body(http::join_form(&[core, scoring]));
         http::json(request, "LichessBroadcastRoundView").await
+    }
+
+    /// Builds the nested `customScoring.*` / `teamCustomScoring.*` form pairs,
+    /// which `serde_urlencoded` cannot express as struct fields.
+    fn scoring_pairs(&self) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
+        if let Some(scoring) = self.custom_scoring {
+            scoring.append_pairs(&mut pairs);
+        }
+        if let Some(team) = self.team_custom_scoring {
+            team.append_pairs("teamCustomScoring", &mut pairs);
+        }
+        pairs
     }
 }
 
