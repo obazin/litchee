@@ -181,9 +181,6 @@ pub struct LichessExternalEngineRegistration {
     pub max_hash: u32,
     /// A secret shared with the engine provider.
     pub provider_secret: Secret<String>,
-    /// Default search depth.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub default_depth: Option<u32>,
     /// Supported variants (UCI variant names).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub variants: Vec<String>,
@@ -249,7 +246,7 @@ mod tests {
         };
         let json = serde_json::to_string(&registration).unwrap();
         assert!(!json.contains("variants"));
-        assert!(!json.contains("defaultDepth"));
+        assert!(!json.contains("providerData"));
     }
 }
 
