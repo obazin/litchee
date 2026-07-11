@@ -2,7 +2,9 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
-use litchee::api::broadcasting::broadcasts::{BroadcastGrouping, BroadcastTourInfo};
+use litchee::api::broadcasting::broadcasts::{
+    BroadcastCustomPoints, BroadcastCustomScoring, BroadcastGrouping, BroadcastTourInfo,
+};
 use litchee::model::PgnExportOptions;
 use wiremock::matchers::{body_string_contains, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -440,6 +442,9 @@ async fn create_round_posts_sync_and_scoring_fields() {
         .and(body_string_contains("period=30"))
         .and(body_string_contains("rated=true"))
         .and(body_string_contains("onlyRound=3"))
+        .and(body_string_contains("customScoring.white.win=1.5"))
+        .and(body_string_contains("customScoring.black.draw=0.5"))
+        .and(body_string_contains("teamCustomScoring.win=2"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
@@ -451,6 +456,20 @@ async fn create_round_posts_sync_and_scoring_fields() {
         .period(30)
         .rated(true)
         .only_round(3)
+        .custom_scoring(BroadcastCustomScoring {
+            white: BroadcastCustomPoints {
+                win: 1.5,
+                draw: 0.5,
+            },
+            black: BroadcastCustomPoints {
+                win: 1.5,
+                draw: 0.5,
+            },
+        })
+        .team_custom_scoring(BroadcastCustomPoints {
+            win: 2.0,
+            draw: 1.0,
+        })
         .send()
         .await
         .unwrap();

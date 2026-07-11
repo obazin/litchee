@@ -618,10 +618,56 @@ struct RoundForm<'a> {
     status: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     rated: Option<bool>,
-    #[serde(rename = "customScoring", skip_serializing_if = "Option::is_none")]
-    custom_scoring: Option<&'a str>,
-    #[serde(rename = "teamCustomScoring", skip_serializing_if = "Option::is_none")]
-    team_custom_scoring: Option<&'a str>,
+    #[serde(
+        rename = "customScoring.white.win",
+        skip_serializing_if = "Option::is_none"
+    )]
+    custom_scoring_white_win: Option<f64>,
+    #[serde(
+        rename = "customScoring.white.draw",
+        skip_serializing_if = "Option::is_none"
+    )]
+    custom_scoring_white_draw: Option<f64>,
+    #[serde(
+        rename = "customScoring.black.win",
+        skip_serializing_if = "Option::is_none"
+    )]
+    custom_scoring_black_win: Option<f64>,
+    #[serde(
+        rename = "customScoring.black.draw",
+        skip_serializing_if = "Option::is_none"
+    )]
+    custom_scoring_black_draw: Option<f64>,
+    #[serde(
+        rename = "teamCustomScoring.win",
+        skip_serializing_if = "Option::is_none"
+    )]
+    team_custom_scoring_win: Option<f64>,
+    #[serde(
+        rename = "teamCustomScoring.draw",
+        skip_serializing_if = "Option::is_none"
+    )]
+    team_custom_scoring_draw: Option<f64>,
+}
+
+/// Points awarded for a win and a draw (each `0.0`–`10.0`).
+///
+/// Used both for a single color/team and, via [`BroadcastCustomScoring`], per color.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BroadcastCustomPoints {
+    /// Points awarded for a win.
+    pub win: f64,
+    /// Points awarded for a draw.
+    pub draw: f64,
+}
+
+/// Scoring overrides for both colors of a broadcast round.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BroadcastCustomScoring {
+    /// Points awarded when White wins or draws.
+    pub white: BroadcastCustomPoints,
+    /// Points awarded when Black wins or draws.
+    pub black: BroadcastCustomPoints,
 }
 
 /// Builder for creating a round (under a tournament) or editing a round.
@@ -746,17 +792,21 @@ impl<'a> RoundRequest<'a> {
         self
     }
 
-    /// Sets a custom scoring configuration.
+    /// Overrides the points awarded for wins and draws, per color.
     #[must_use]
-    pub fn custom_scoring(mut self, scoring: &'a str) -> Self {
-        self.form.custom_scoring = Some(scoring);
+    pub fn custom_scoring(mut self, scoring: BroadcastCustomScoring) -> Self {
+        self.form.custom_scoring_white_win = Some(scoring.white.win);
+        self.form.custom_scoring_white_draw = Some(scoring.white.draw);
+        self.form.custom_scoring_black_win = Some(scoring.black.win);
+        self.form.custom_scoring_black_draw = Some(scoring.black.draw);
         self
     }
 
-    /// Sets a custom team scoring configuration.
+    /// Overrides the points awarded for a team-match win or draw.
     #[must_use]
-    pub fn team_custom_scoring(mut self, scoring: &'a str) -> Self {
-        self.form.team_custom_scoring = Some(scoring);
+    pub fn team_custom_scoring(mut self, scoring: BroadcastCustomPoints) -> Self {
+        self.form.team_custom_scoring_win = Some(scoring.win);
+        self.form.team_custom_scoring_draw = Some(scoring.draw);
         self
     }
 
