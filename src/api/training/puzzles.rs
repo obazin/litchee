@@ -138,7 +138,7 @@ impl<'a> PuzzlesApi<'a> {
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .query(&[("nb", nb.to_string())])
+            .query(&[("nb", nb)])
             .json(&body);
         http::json(request, "LichessPuzzleSolveResponse").await
     }

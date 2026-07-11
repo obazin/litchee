@@ -121,14 +121,10 @@ impl<'a> ChallengesApi<'a> {
         token2: Option<&str>,
     ) -> Result<()> {
         let path = format!("/api/challenge/{}/start-clocks", http::segment(game_id));
-        let mut query = vec![("token1", token1)];
-        if let Some(token2) = token2 {
-            query.push(("token2", token2));
-        }
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .query(&query);
+            .query(&[("token1", Some(token1)), ("token2", token2)]);
         http::ok(request).await
     }
 

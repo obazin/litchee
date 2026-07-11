@@ -336,34 +336,29 @@ impl<'a> AutocompleteRequest<'a> {
         self
     }
 
+    /// Builds the GET request with the current query.
+    fn request(&self) -> http::ApiRequest {
+        self.client
+            .request(Method::GET, Host::Default, "/api/player/autocomplete")
+            .query(&self.query)
+    }
+
     /// Executes the autocomplete, returning matching usernames.
     pub async fn send(self) -> Result<Vec<String>> {
-        let request = self
-            .client
-            .request(Method::GET, Host::Default, "/api/player/autocomplete")
-            .query(&self.query);
-        http::json(request, "Vec<String>").await
+        http::json(self.request(), "Vec<String>").await
     }
 
     /// Checks only whether a user with this exact term exists (`exists=true`).
     pub async fn exists(mut self) -> Result<bool> {
         self.query.exists = Some(true);
-        let request = self
-            .client
-            .request(Method::GET, Host::Default, "/api/player/autocomplete")
-            .query(&self.query);
-        http::json(request, "bool").await
+        http::json(self.request(), "bool").await
     }
 
     /// Executes the autocomplete, returning full user objects (`object=true`).
     pub async fn objects(mut self) -> Result<Vec<LichessLightUserOnline>> {
         self.query.object = Some(true);
-        let request = self
-            .client
-            .request(Method::GET, Host::Default, "/api/player/autocomplete")
-            .query(&self.query);
         let response: AutocompleteObjectResponse =
-            http::json(request, "autocomplete result").await?;
+            http::json(self.request(), "autocomplete result").await?;
         Ok(response.result)
     }
 }
