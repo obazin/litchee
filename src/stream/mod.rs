@@ -26,13 +26,22 @@ impl LineSplitter {
         self.buffer.extend_from_slice(chunk);
     }
 
-    /// Removes and returns the next complete line (without its `\n`), if one is
-    /// fully buffered.
-    fn next_line(&mut self) -> Option<Vec<u8>> {
-        let newline = self.buffer.iter().position(|byte| *byte == b'\n')?;
-        let mut line: Vec<u8> = self.buffer.drain(..=newline).collect();
-        line.pop(); // drop the trailing '\n'
-        Some(line)
+    /// Index of the next `\n`, if a complete line is buffered.
+    fn line_end(&self) -> Option<usize> {
+        self.buffer.iter().position(|byte| *byte == b'\n')
+    }
+
+    /// The bytes of the line ending at `newline` (excluding the `\n` itself).
+    ///
+    /// Borrows the buffer so the line can be parsed without copying; call
+    /// [`consume`](Self::consume) afterwards to drop it.
+    fn line(&self, newline: usize) -> &[u8] {
+        &self.buffer[..newline]
+    }
+
+    /// Drops a consumed line and its trailing `\n` from the buffer.
+    fn consume(&mut self, newline: usize) {
+        self.buffer.drain(..=newline);
     }
 
     /// Returns any trailing bytes not terminated by a newline.
@@ -77,8 +86,10 @@ where
         while let Some(chunk) = bytes.next().await {
             let chunk = chunk.map_err(StreamError::Transport)?;
             splitter.push(&chunk);
-            while let Some(line) = splitter.next_line() {
-                if let Some(item) = parse_line(&line)? {
+            while let Some(newline) = splitter.line_end() {
+                let parsed = parse_line(splitter.line(newline))?;
+                splitter.consume(newline);
+                if let Some(item) = parsed {
                     yield item;
                 }
             }
@@ -102,15 +113,24 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
+    /// Takes the next complete line (without its `\n`) as an owned `Vec`, or
+    /// `None` if the buffer holds no complete line yet.
+    fn take_line(splitter: &mut LineSplitter) -> Option<Vec<u8>> {
+        let newline = splitter.line_end()?;
+        let line = splitter.line(newline).to_vec();
+        splitter.consume(newline);
+        Some(line)
+    }
+
     #[test]
     fn splits_lines_across_chunk_boundaries() {
         let mut splitter = LineSplitter::default();
         splitter.push(b"{\"a\":1}\n{\"b\"");
-        assert_eq!(splitter.next_line(), Some(b"{\"a\":1}".to_vec()));
-        assert_eq!(splitter.next_line(), None);
+        assert_eq!(take_line(&mut splitter), Some(b"{\"a\":1}".to_vec()));
+        assert_eq!(take_line(&mut splitter), None);
         splitter.push(b":2}\n");
-        assert_eq!(splitter.next_line(), Some(b"{\"b\":2}".to_vec()));
-        assert_eq!(splitter.next_line(), None);
+        assert_eq!(take_line(&mut splitter), Some(b"{\"b\":2}".to_vec()));
+        assert_eq!(take_line(&mut splitter), None);
         assert_eq!(splitter.finish(), None);
     }
 
@@ -122,7 +142,7 @@ mod tests {
         assert!(splitter.overflowed(4));
         // A completed line is drained, so it does not count toward the cap.
         splitter.push(b"\n");
-        let _ = splitter.next_line();
+        let _ = take_line(&mut splitter);
         assert!(!splitter.overflowed(0));
     }
 
@@ -130,7 +150,7 @@ mod tests {
     fn finish_returns_unterminated_trailing_line() {
         let mut splitter = LineSplitter::default();
         splitter.push(b"{\"x\":1}");
-        assert_eq!(splitter.next_line(), None);
+        assert_eq!(take_line(&mut splitter), None);
         assert_eq!(splitter.finish(), Some(b"{\"x\":1}".to_vec()));
     }
 
