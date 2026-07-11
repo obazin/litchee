@@ -110,14 +110,25 @@ impl<'a> ChallengesApi<'a> {
         OpenChallengeRequest::new(self.client)
     }
 
-    /// Starts the clocks of a game immediately, using both players' tokens.
+    /// Starts the clocks of a game immediately.
+    ///
+    /// `token2` may be omitted (`None`) for AI games that have only one player.
     /// `POST /api/challenge/{gameId}/start-clocks`
-    pub async fn start_clocks(&self, game_id: &str, token1: &str, token2: &str) -> Result<()> {
+    pub async fn start_clocks(
+        &self,
+        game_id: &str,
+        token1: &str,
+        token2: Option<&str>,
+    ) -> Result<()> {
         let path = format!("/api/challenge/{}/start-clocks", http::segment(game_id));
+        let mut query = vec![("token1", token1)];
+        if let Some(token2) = token2 {
+            query.push(("token2", token2));
+        }
         let request = self
             .client
             .request(Method::POST, Host::Default, &path)
-            .query(&[("token1", token1), ("token2", token2)]);
+            .query(&query);
         http::ok(request).await
     }
 

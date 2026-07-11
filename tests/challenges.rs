@@ -3,7 +3,9 @@
 use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::gameplay::challenges::LichessChallengeColor;
-use wiremock::matchers::{body_string_contains, header, method, path, query_param};
+use wiremock::matchers::{
+    body_string_contains, header, method, path, query_param, query_param_is_missing,
+};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> LichessClient {
@@ -191,7 +193,24 @@ async fn start_clocks_sends_tokens() {
         .await;
     client(&server)
         .challenges()
-        .start_clocks("g", "t1", "t2")
+        .start_clocks("g", "t1", Some("t2"))
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn start_clocks_omits_token2_for_ai_games() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/challenge/g/start-clocks"))
+        .and(query_param("token1", "t1"))
+        .and(query_param_is_missing("token2"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
+        .mount(&server)
+        .await;
+    client(&server)
+        .challenges()
+        .start_clocks("g", "t1", None)
         .await
         .unwrap();
 }
