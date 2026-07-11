@@ -12,6 +12,19 @@ use crate::error::Result;
 use crate::http;
 use crate::model::PgnExportOptions;
 
+/// Analysis mode applied to chapters imported into a study.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum StudyChapterMode {
+    /// Practise with the computer.
+    Practice,
+    /// Hide the next moves.
+    Conceal,
+    /// Interactive lesson (gamebook).
+    Gamebook,
+}
+
 /// Form body for importing PGN into a study.
 #[derive(Debug, Serialize)]
 struct ImportForm<'a> {
@@ -22,7 +35,7 @@ struct ImportForm<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     variant: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    mode: Option<&'a str>,
+    mode: Option<StudyChapterMode>,
 }
 
 /// Accessor for the Studies API.
@@ -317,9 +330,10 @@ impl<'a> ImportPgnRequest<'a> {
         self
     }
 
-    /// Sets how chapters are added (`orientation`, or `each` for one per game).
+    /// Sets the analysis mode for the imported chapters
+    /// (`practice`, `conceal`, or `gamebook`).
     #[must_use]
-    pub fn mode(mut self, mode: &'a str) -> Self {
+    pub fn mode(mut self, mode: StudyChapterMode) -> Self {
         self.form.mode = Some(mode);
         self
     }

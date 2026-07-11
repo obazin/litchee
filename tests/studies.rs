@@ -2,6 +2,7 @@
 
 use futures_util::StreamExt;
 use litchee::LichessClient;
+use litchee::api::training::studies::StudyChapterMode;
 use litchee::model::PgnExportOptions;
 use wiremock::matchers::{body_string_contains, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -133,7 +134,7 @@ async fn import_pgn_posts_name_and_pgn() {
         .and(path("/api/study/WTvnkWAL/import-pgn"))
         .and(body_string_contains("name=Game"))
         .and(body_string_contains("pgn="))
-        .and(body_string_contains("mode=each"))
+        .and(body_string_contains("mode=gamebook"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
@@ -142,7 +143,7 @@ async fn import_pgn_posts_name_and_pgn() {
         .studies()
         .import_pgn("WTvnkWAL", "Game 1", "1. e4 e5 *")
         .orientation("white")
-        .mode("each")
+        .mode(StudyChapterMode::Gamebook)
         .send()
         .await
         .unwrap();
