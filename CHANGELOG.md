@@ -3,6 +3,42 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.1.5](https://github.com/obazin/litchee/releases/tag/v0.1.5) — 2026-07-14
+Changes since [v0.1.4](https://github.com/obazin/litchee/releases/tag/v0.1.4).
+
+
+### Features
+- **users:** Fully model PerfStat stat aggregate and Activity categories
+- **users:** Expose autocomplete exists and object response variants
+- **broadcasts:** Type round customScoring as structured points
+- **external-engine:** Type analyse work as LichessExternalEngineWork
+- **swiss:** Model roundInterval sentinels via SwissRoundInterval enum
+- **puzzles:** Expose nb param and full solve response for solve_batch
+
+
+### Fixes
+- **external-engine:** Drop non-spec defaultDepth registration field
+- **challenges:** Make start_clocks token2 optional for AI games
+- **studies:** Type import_pgn mode as a spec-accurate enum
+
+
+### Performance
+- **stream:** Parse NDJSON lines without a per-line allocation
+
+
+### Refactor
+- **challenges:** Type accept color param as LichessColor
+- **opening-explorer:** Type variant param as LichessVariantKey
+- **studies:** Type import/create params with existing enums
+- **puzzles:** Type puzzle color param as LichessColor
+- **users:** Flatten LichessLightUser into LichessUserStatus
+- **http:** Centralize text/plain bodies behind ApiRequest::text_body
+- Drop needless allocations and dedup autocomplete request build
+- **broadcasts:** Model round custom-scoring as value types with append_pairs
+
+
+### Documentation
+- Correct dev-shell description (standalone fenix flake, not chess-flake)
 ## [v0.1.4](https://github.com/obazin/litchee/releases/tag/v0.1.4) — 2026-07-09
 Changes since [v0.1.3](https://github.com/obazin/litchee/releases/tag/v0.1.3).
 
