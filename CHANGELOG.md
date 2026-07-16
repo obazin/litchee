@@ -3,11 +3,12 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
-## [unreleased]
+## [v0.1.6](https://github.com/obazin/litchee/releases/tag/v0.1.6) — 2026-07-16
 Changes since [v0.1.5](https://github.com/obazin/litchee/releases/tag/v0.1.5).
 
 
 ### Fixes
+- **changelog:** Stop git-cliff dropping dependency and spec commits
 - **ci:** Run audit job on stable so cargo-audit compiles (#28)
 
 
