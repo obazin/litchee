@@ -60,8 +60,15 @@ jobs:
     # being removed from runners on 2026-09-16. The node24 fix exists only on
     # the action's unreleased default branch, so opt the job into the Node.js 24
     # runtime via GitHub's documented override until a tagged release ships it.
+    #
+    # RUSTUP_TOOLCHAIN=stable: the action runs `cargo install cargo-audit`, whose
+    # dependency tree now needs rustc >= 1.96 (kstring 2.0.3). This job installs
+    # no toolchain of its own, so rust-toolchain.toml's 1.95.0 directory override
+    # would otherwise win and the install fails to compile. Pointing rustup at
+    # stable outranks the toml (same reasoning as the `test` job above).
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      RUSTUP_TOOLCHAIN: stable
     steps:
       - uses: actions/checkout@v7
       - name: Audit dependencies for RustSec advisories
