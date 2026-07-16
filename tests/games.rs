@@ -4,7 +4,9 @@ use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::gameplay::games::GameSort;
 use litchee::model::{GameExportOptions, LichessColor};
-use wiremock::matchers::{body_string_contains, header, method, path, query_param};
+use wiremock::matchers::{
+    body_string_contains, header, method, path, query_param, query_param_is_missing,
+};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> LichessClient {
@@ -448,6 +450,38 @@ async fn add_to_stream_posts_ids() {
     client(&server)
         .games()
         .add_to_stream("mystream", &["a", "b"])
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn bookmark_toggles_game() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/bookmark/5IrD6Gzz"))
+        .and(query_param_is_missing("v"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
+    client(&server)
+        .games()
+        .bookmark("5IrD6Gzz", None)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn bookmark_sets_explicit_value() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/bookmark/5IrD6Gzz"))
+        .and(query_param("v", "true"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
+    client(&server)
+        .games()
+        .bookmark("5IrD6Gzz", Some(true))
         .await
         .unwrap();
 }
