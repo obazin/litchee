@@ -13,9 +13,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    # Match the repo's conventional-commit convention (see CLAUDE.md).
+    # Match the repo's conventional-commit convention (see CLAUDE.md). `include:
+    # scope` yields `chore(deps): bump ...`, which is what cliff.toml groups
+    # under "Dependencies & spec"; a bare `chore:` prefix is skipped as a chore.
     commit-message:
       prefix: chore
+      include: scope
     groups:
       # Roll routine minor/patch bumps into a single PR to keep the noise down;
       # major bumps still arrive as individual PRs so they can be reviewed alone.
@@ -31,6 +34,7 @@ updates:
       interval: weekly
     commit-message:
       prefix: chore
+      include: scope
     ignore:
       # dtolnay/rust-toolchain's tag is the Rust *channel* (i.e. our MSRV), not
       # an action version. Left alone, Dependabot "bumps" @1.95.0 -> @1.100.0,
@@ -51,3 +55,4 @@ updates:
       interval: weekly
     commit-message:
       prefix: chore
+      include: scope

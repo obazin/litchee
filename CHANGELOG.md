@@ -3,6 +3,18 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [unreleased]
+Changes since [v0.1.5](https://github.com/obazin/litchee/releases/tag/v0.1.5).
+
+
+### Fixes
+- **ci:** Run audit job on stable so cargo-audit compiles (#28)
+
+
+### Dependencies & spec
+- Sync Lichess API spec to v2.0.153 (add bookmark game endpoint) (#27)
+- Bump reference/lichess-api from `a0f82d0` to `3033570` (#25)
+- Bump bytes from 1.12.0 to 1.12.1 in the cargo-minor-patch group (#26)
 ## [v0.1.5](https://github.com/obazin/litchee/releases/tag/v0.1.5) — 2026-07-14
 Changes since [v0.1.4](https://github.com/obazin/litchee/releases/tag/v0.1.4).
 
@@ -78,6 +90,11 @@ Changes since [v0.1.3](https://github.com/obazin/litchee/releases/tag/v0.1.3).
 ### Documentation
 - Point broadcast tournament PGN export to streaming endpoints
 - Fix stale README broadcasts().official() example
+
+
+### Dependencies & spec
+- **spec:** Bump lichess-api submodule to v2.0.152 (a0f82d0)
+- Bump rand from 0.10.1 to 0.10.2 in the cargo-minor-patch group (#21)
 ## [v0.1.3](https://github.com/obazin/litchee/releases/tag/v0.1.3) — 2026-07-08
 Changes since [v0.1.2](https://github.com/obazin/litchee/releases/tag/v0.1.2).
 
@@ -91,6 +108,11 @@ Changes since [v0.1.1](https://github.com/obazin/litchee/releases/tag/v0.1.1).
 
 ### Fixes
 - Bump anyhow to 1.0.103 to resolve RUSTSEC-2026-0190 (#18)
+
+
+### Dependencies & spec
+- Sync client with Lichess API 2.0.151 (#16)
+- Bump reference/lichess-api from `0d11023` to `5ec6ce5` (#17)
 ## [v0.1.1](https://github.com/obazin/litchee/releases/tag/v0.1.1) — 2026-06-27
 Changes since [v0.1.0](https://github.com/obazin/litchee/releases/tag/v0.1.0).
 
@@ -102,6 +124,16 @@ Changes since [v0.1.0](https://github.com/obazin/litchee/releases/tag/v0.1.0).
 ### Fixes
 - **ci:** Run the stable job on stable, not the toml-pinned MSRV
 - Stop Dependabot from bumping dtolnay/rust-toolchain (our MSRV pin)
+
+
+### Dependencies & spec
+- Bump reference/lichess-api from `1e03c61` to `0d11023` (#12)
+- Bump actions/checkout from 6 to 7 in the github-actions group (#13)
+- Bump bytes from 1.11.1 to 1.12.0 in the cargo-minor-patch group (#14)
+- Bump quinn-proto 0.11.14 -> 0.11.15 (RUSTSEC-2026-0185)
+- Bump sha2 from 0.10.9 to 0.11.0 (#9)
+- Bump reference/lichess-api from `f38daa5` to `1e03c61` (#6)
+- Bump CodeQL action to v4 (Node 24, clears deprecation warnings)
 ## [v0.1.0](https://github.com/obazin/litchee/releases/tag/v0.1.0) — 2026-06-15
 
 
@@ -140,4 +172,9 @@ Changes since [v0.1.0](https://github.com/obazin/litchee/releases/tag/v0.1.0).
 - Warn that a non-TLS base URL transmits the token in cleartext
 - Add beginner PKCE flow guide and link it from the README
 - Point repository URL at obazin/litchee
+
+
+### Dependencies & spec
+- Vendor lichess-api spec as a submodule at latest upstream
+- Bump CI toolchain, raise MSRV to 1.95, and satisfy clippy
 

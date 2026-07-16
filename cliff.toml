@@ -68,7 +68,14 @@ commit_parsers = [
   { message = "^(refacto|refactor)",  group = "<!-- 3 -->Refactor" },
   { message = "^docs",                group = "<!-- 4 -->Documentation" },
   { message = "^chore\\(release\\)",  skip = true },
-  { message = "^chore\\(deps\\)",     group = "<!-- 5 -->Dependencies & spec" },
-  { message = "^build\\(deps\\)",     group = "<!-- 5 -->Dependencies & spec" },
+  # Dependency bumps and spec syncs. These must stay *below* the release rule
+  # (`chore(release): bump version to X` would otherwise land here) and *above*
+  # the catch-all skip. Dependabot writes a bare `chore` prefix with no scope
+  # (.github/dependabot.yml), and the spec-sync routine writes plain `chore:`
+  # too, so match the unscoped spellings as well — matching only `(deps)` lets
+  # every bump fall through to the catch-all skip and vanish from the changelog.
+  { message = "^(chore|build)\\(deps",                                 group = "<!-- 5 -->Dependencies & spec" },
+  { message = "^(chore|build)(\\(.*\\))?!?: bump ",                    group = "<!-- 5 -->Dependencies & spec" },
+  { message = "^chore(\\(.*\\))?!?: (sync|vendor) .*\\b(spec|API)\\b", group = "<!-- 5 -->Dependencies & spec" },
   { message = "^(test|ci|style|build|chore)", skip = true },
 ]
