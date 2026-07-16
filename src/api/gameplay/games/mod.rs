@@ -110,6 +110,20 @@ impl<'a> GamesApi<'a> {
         let request = self.client.request(Method::GET, Host::Default, &path);
         http::json(request, "Vec<LichessGameChatMessage>").await
     }
+
+    /// Bookmarks a game for the authenticated user. `POST /bookmark/{gameId}`
+    ///
+    /// With `set` as `None` the bookmark is toggled (added if absent, removed if
+    /// present); `Some(true)` adds it and `Some(false)` removes it, making the
+    /// call idempotent. Requires the `preference:write` scope.
+    pub async fn bookmark(&self, game_id: &str, set: Option<bool>) -> Result<()> {
+        let path = format!("/bookmark/{}", http::segment(game_id));
+        let request = self
+            .client
+            .request(Method::POST, Host::Default, &path)
+            .query(&[("v", set)]);
+        http::ok(request).await
+    }
 }
 
 impl LichessClient {

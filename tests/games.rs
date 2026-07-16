@@ -451,3 +451,34 @@ async fn add_to_stream_posts_ids() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+async fn bookmark_toggles_game() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/bookmark/5IrD6Gzz"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
+    client(&server)
+        .games()
+        .bookmark("5IrD6Gzz", None)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn bookmark_sets_explicit_value() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/bookmark/5IrD6Gzz"))
+        .and(query_param("v", "true"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
+    client(&server)
+        .games()
+        .bookmark("5IrD6Gzz", Some(true))
+        .await
+        .unwrap();
+}
