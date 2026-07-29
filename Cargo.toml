@@ -37,7 +37,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 async-stream = "0.3.6"
-base64 = "0.22.1"
+base64 = "0.23.0"
 bytes = "1.11.1"
 futures-core = "0.3.32"
 futures-util = "0.3.32"
