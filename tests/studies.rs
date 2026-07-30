@@ -175,6 +175,8 @@ async fn create_study_returns_id() {
         .and(body_string_contains("name=My+Study"))
         .and(body_string_contains("cloneable=nobody"))
         .and(body_string_contains("sticky=false"))
+        .and(body_string_contains("flair=activity.chess-pawn"))
+        .and(body_string_contains("description=true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"abc12345"}"#))
         .mount(&server)
         .await;
@@ -184,6 +186,8 @@ async fn create_study_returns_id() {
         .visibility("private")
         .cloneable("nobody")
         .sticky(false)
+        .flair("activity.chess-pawn")
+        .description(true)
         .send()
         .await
         .unwrap();

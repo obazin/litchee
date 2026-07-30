@@ -200,6 +200,8 @@ struct CreateStudyForm<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     visibility: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    flair: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     computer: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     explorer: Option<&'a str>,
@@ -211,6 +213,8 @@ struct CreateStudyForm<'a> {
     chat: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     sticky: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<bool>,
 }
 
 /// Builder for creating a study.
@@ -236,6 +240,13 @@ impl<'a> CreateStudyRequest<'a> {
     #[must_use]
     pub fn visibility(mut self, visibility: &'a str) -> Self {
         self.form.visibility = Some(visibility);
+        self
+    }
+
+    /// Sets the study flair (see the Lichess flair list).
+    #[must_use]
+    pub fn flair(mut self, flair: &'a str) -> Self {
+        self.form.flair = Some(flair);
         self
     }
 
@@ -278,6 +289,13 @@ impl<'a> CreateStudyRequest<'a> {
     #[must_use]
     pub fn sticky(mut self, sticky: bool) -> Self {
         self.form.sticky = Some(sticky);
+        self
+    }
+
+    /// Sets whether to add a pinned study comment right under the board.
+    #[must_use]
+    pub fn description(mut self, description: bool) -> Self {
+        self.form.description = Some(description);
         self
     }
 
@@ -424,6 +442,25 @@ mod tests {
         let meta: LichessStudyMetadata = serde_json::from_str(json).unwrap();
         assert_eq!(meta.id, "WTvnkWAL");
         assert_eq!(meta.updated_at, Some(1_469_965_025_205));
+    }
+
+    #[test]
+    fn serializes_create_study_form() {
+        let form = CreateStudyForm {
+            name: "My Study",
+            visibility: Some("private"),
+            flair: Some("smileys.slightly-smiling-face"),
+            sticky: Some(false),
+            description: Some(true),
+            ..Default::default()
+        };
+        let body = serde_urlencoded::to_string(&form).unwrap();
+        assert!(body.contains("name=My+Study"));
+        assert!(body.contains("flair=smileys.slightly-smiling-face"));
+        assert!(body.contains("sticky=false"));
+        assert!(body.contains("description=true"));
+        // Omitted optional fields must not be serialized.
+        assert!(!body.contains("computer="));
     }
 
     #[test]
