@@ -417,7 +417,7 @@ impl<'a> BroadcastGrouping<'a> {
         self
     }
 
-    /// Sets the comma-separated tournament ids to group together.
+    /// Sets the linebreak-separated tournament ids to group together.
     #[must_use]
     pub fn tours(mut self, tours: &'a str) -> Self {
         self.tours = Some(tours);
