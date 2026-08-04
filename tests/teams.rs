@@ -240,6 +240,49 @@ async fn decline_request_posts_to_the_path() {
 }
 
 #[tokio::test]
+async fn updates_returns_paginated_updates() {
+    let server = MockServer::start().await;
+    let body = r#"{"byTeam":[{"last":1785681992878,"team":{"id":"coders","name":"Coders"},
+        "unread":6}],"updates":{"currentPage":1,"maxPerPage":6,"currentPageResults":[
+        {"msg":{"date":1785681992878,"id":"3gJtsRcB","sender":{"id":"thibault",
+        "name":"thibault"},"team":{"id":"coders","name":"Coders"},"text":"hi"},
+        "seen":false}],"nbPages":8,"nbResults":46,"nextPage":2,"previousPage":null}}"#;
+    Mock::given(method("GET"))
+        .and(path("/team/updates"))
+        .and(query_param("page", "1"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let updates = client(&server).teams().updates(Some(1)).await.unwrap();
+
+    assert_eq!(updates.updates.nb_results, 46);
+    assert_eq!(updates.by_team[0].unread, 6);
+}
+
+#[tokio::test]
+async fn team_updates_returns_updates_of_one_team() {
+    let server = MockServer::start().await;
+    let body = r#"{"team":{"id":"coders","name":"Coders"},"subscribed":true,"byTeam":[],
+        "updates":{"currentPage":1,"maxPerPage":6,"currentPageResults":[],
+        "nbPages":1,"nbResults":0,"nextPage":null,"previousPage":null}}"#;
+    Mock::given(method("GET"))
+        .and(path("/team/updates/coders"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let of_team = client(&server)
+        .teams()
+        .team_updates("coders", None)
+        .await
+        .unwrap();
+
+    assert!(of_team.subscribed);
+    assert_eq!(of_team.team.id, "coders");
+}
+
+#[tokio::test]
 async fn swiss_tournaments_streams() {
     let server = MockServer::start().await;
     let body = "{\"id\":\"a\"}\n{\"id\":\"b\"}\n";

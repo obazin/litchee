@@ -121,7 +121,8 @@ impl<'a> TeamsApi<'a> {
         http::ok(self.client.request(Method::POST, Host::Default, &path)).await
     }
 
-    /// Sends a private message to all members. `POST /team/{teamId}/pm-all`
+    /// Sends a team update to all members. Requires the "Updates" leader
+    /// permission. `POST /team/{teamId}/pm-all`
     pub async fn message_all(&self, team_id: &str, message: &str) -> Result<()> {
         let path = format!("/team/{}/pm-all", http::segment(team_id));
         let request = self
@@ -197,6 +198,31 @@ impl<'a> TeamsApi<'a> {
             .request(Method::GET, Host::Default, &path)
             .query(query);
         http::stream(request, self.client.max_line_bytes()).await
+    }
+
+    /// Gets the most recent updates posted by leaders of teams you joined,
+    /// paginated. `GET /team/updates`
+    pub async fn updates(&self, page: Option<u32>) -> Result<LichessTeamUpdates> {
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, "/team/updates")
+            .query(&[("page", page)]);
+        http::json(request, "LichessTeamUpdates").await
+    }
+
+    /// Gets the most recent updates from a single team you joined, paginated.
+    /// `GET /team/updates/{teamId}`
+    pub async fn team_updates(
+        &self,
+        team_id: &str,
+        page: Option<u32>,
+    ) -> Result<LichessTeamUpdatesOfTeam> {
+        let path = format!("/team/updates/{}", http::segment(team_id));
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("page", page)]);
+        http::json(request, "LichessTeamUpdatesOfTeam").await
     }
 }
 
@@ -335,6 +361,107 @@ pub struct LichessTeamRequestWithUser {
     pub user: LichessUser,
 }
 
+/// A minimal team reference: just enough to identify and display a team.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessLightTeam {
+    /// The team id.
+    pub id: String,
+    /// The team name.
+    pub name: String,
+    /// The team flair, if set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flair: Option<String>,
+}
+
+/// The message carried by a single team update.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessTeamUpdateMessage {
+    /// The update id.
+    pub id: String,
+    /// When it was posted (Unix milliseconds).
+    pub date: i64,
+    /// The leader who posted it.
+    pub sender: LichessLightUser,
+    /// The team it was posted to, if included.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub team: Option<LichessLightTeam>,
+    /// The update text.
+    pub text: String,
+}
+
+/// A single team update and whether the caller has seen it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessTeamUpdate {
+    /// The update message.
+    pub msg: LichessTeamUpdateMessage,
+    /// Whether the caller has already seen this update.
+    pub seen: bool,
+}
+
+/// A paginated list of team updates.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct LichessTeamUpdatesPager {
+    /// The current page number.
+    pub current_page: u32,
+    /// The maximum results per page.
+    pub max_per_page: u32,
+    /// The updates on this page.
+    pub current_page_results: Vec<LichessTeamUpdate>,
+    /// The previous page number, if any.
+    #[serde(default)]
+    pub previous_page: Option<u32>,
+    /// The next page number, if any.
+    #[serde(default)]
+    pub next_page: Option<u32>,
+    /// The total number of results.
+    pub nb_results: u32,
+    /// The total number of pages.
+    pub nb_pages: u32,
+}
+
+/// Per-team unread summary of updates.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessTeamUpdatesByTeam {
+    /// The team.
+    pub team: LichessLightTeam,
+    /// The timestamp of the most recent update (Unix milliseconds).
+    pub last: f64,
+    /// The number of unread updates.
+    pub unread: u32,
+}
+
+/// Updates aggregated across all the teams the caller has joined.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct LichessTeamUpdates {
+    /// The paginated updates.
+    pub updates: LichessTeamUpdatesPager,
+    /// The per-team unread summaries.
+    pub by_team: Vec<LichessTeamUpdatesByTeam>,
+}
+
+/// Updates for a single team, with the caller's subscription state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct LichessTeamUpdatesOfTeam {
+    /// The team.
+    pub team: LichessLightTeam,
+    /// Whether the caller is subscribed to this team's updates.
+    pub subscribed: bool,
+    /// The paginated updates.
+    pub updates: LichessTeamUpdatesPager,
+    /// The per-team unread summaries.
+    pub by_team: Vec<LichessTeamUpdatesByTeam>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -391,5 +518,37 @@ mod tests {
         let req: LichessTeamRequestWithUser = serde_json::from_str(json).unwrap();
         assert_eq!(req.request.user_id, "mary");
         assert_eq!(req.user.username, "Mary");
+    }
+
+    #[test]
+    fn parses_team_updates() {
+        let json = r#"{
+            "byTeam":[{"last":1785681992878,"team":{"id":"coders","name":"Coders",
+                "flair":"objects.hammer-and-wrench"},"unread":6}],
+            "updates":{"currentPage":1,"maxPerPage":6,"currentPageResults":[
+                {"msg":{"date":1785681992878,"id":"3gJtsRcB",
+                    "sender":{"id":"thibault","name":"thibault","patron":true},
+                    "team":{"id":"coders","name":"Coders"},"text":"hi"},"seen":false}],
+                "nbPages":8,"nbResults":46,"nextPage":2,"previousPage":null}
+        }"#;
+        let updates: LichessTeamUpdates = serde_json::from_str(json).unwrap();
+        assert_eq!(updates.by_team[0].team.id, "coders");
+        assert_eq!(updates.by_team[0].unread, 6);
+        assert_eq!(updates.updates.next_page, Some(2));
+        assert_eq!(updates.updates.previous_page, None);
+        let first = &updates.updates.current_page_results[0];
+        assert_eq!(first.msg.sender.id, "thibault");
+        assert!(!first.seen);
+    }
+
+    #[test]
+    fn parses_team_updates_of_team() {
+        let json = r#"{"team":{"id":"c","name":"C"},"subscribed":true,"byTeam":[],
+            "updates":{"currentPage":1,"maxPerPage":6,"currentPageResults":[],
+                "nbPages":1,"nbResults":0,"nextPage":null,"previousPage":null}}"#;
+        let of_team: LichessTeamUpdatesOfTeam = serde_json::from_str(json).unwrap();
+        assert!(of_team.subscribed);
+        assert_eq!(of_team.team.id, "c");
+        assert!(of_team.updates.current_page_results.is_empty());
     }
 }
