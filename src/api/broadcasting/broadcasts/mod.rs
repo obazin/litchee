@@ -195,6 +195,26 @@ impl<'a> BroadcastsApi<'a> {
         http::text(request).await
     }
 
+    /// Streams the PGN of all ongoing and recently finished rounds of a
+    /// broadcast tournament as games are updated (text; stays open while the
+    /// tournament is live). Only `clocks`/`comments` options apply.
+    /// `GET /api/stream/broadcast/tour/{broadcastTourId}.pgn`
+    pub async fn stream_tour_pgn(
+        &self,
+        tournament_id: &str,
+        options: &PgnExportOptions,
+    ) -> Result<String> {
+        let path = format!(
+            "/api/stream/broadcast/tour/{}.pgn",
+            http::segment(tournament_id)
+        );
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(options);
+        http::text(request).await
+    }
+
     /// Pushes PGN games to a round.
     /// `POST /api/broadcast/round/{roundId}/push`
     pub async fn push_pgn(&self, round_id: &str, pgn: &str) -> Result<LichessBroadcastPushResult> {
@@ -417,7 +437,7 @@ impl<'a> BroadcastGrouping<'a> {
         self
     }
 
-    /// Sets the comma-separated tournament ids to group together.
+    /// Sets the linebreak-separated tournament ids to group together.
     #[must_use]
     pub fn tours(mut self, tours: &'a str) -> Self {
         self.tours = Some(tours);

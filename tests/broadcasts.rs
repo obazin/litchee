@@ -353,6 +353,25 @@ async fn stream_group_pgn_returns_text() {
 }
 
 #[tokio::test]
+async fn stream_tour_pgn_returns_text() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/stream/broadcast/tour/jfEpUuzg.pgn"))
+        .and(query_param("clocks", "true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("[Event \"Tour\"]\n\n1. e4 *"))
+        .mount(&server)
+        .await;
+
+    let pgn = client(&server)
+        .broadcasts()
+        .stream_tour_pgn("jfEpUuzg", &PgnExportOptions::default().clocks(true))
+        .await
+        .unwrap();
+
+    assert!(pgn.contains("Tour"));
+}
+
+#[tokio::test]
 async fn player_returns_a_single_entry() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
