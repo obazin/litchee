@@ -210,7 +210,11 @@ struct CreateStudyForm<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     chat: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    flair: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     sticky: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<bool>,
 }
 
 /// Builder for creating a study.
@@ -274,10 +278,24 @@ impl<'a> CreateStudyRequest<'a> {
         self
     }
 
+    /// Sets the study flair (see the Lichess flair list).
+    #[must_use]
+    pub fn flair(mut self, flair: &'a str) -> Self {
+        self.form.flair = Some(flair);
+        self
+    }
+
     /// Sets whether everyone stays on the same chapter/position.
     #[must_use]
     pub fn sticky(mut self, sticky: bool) -> Self {
         self.form.sticky = Some(sticky);
+        self
+    }
+
+    /// Sets whether to add a pinned study comment right under the board.
+    #[must_use]
+    pub fn description(mut self, description: bool) -> Self {
+        self.form.description = Some(description);
         self
     }
 
@@ -316,7 +334,8 @@ impl<'a> ImportPgnRequest<'a> {
         }
     }
 
-    /// Sets the board orientation.
+    /// Sets the board orientation. When unset, Lichess determines it
+    /// automatically from the imported PGN.
     #[must_use]
     pub fn orientation(mut self, orientation: LichessColor) -> Self {
         self.form.orientation = Some(orientation);

@@ -174,7 +174,9 @@ async fn create_study_returns_id() {
         .and(path("/api/study"))
         .and(body_string_contains("name=My+Study"))
         .and(body_string_contains("cloneable=nobody"))
+        .and(body_string_contains("flair=nature.seedling"))
         .and(body_string_contains("sticky=false"))
+        .and(body_string_contains("description=true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"abc12345"}"#))
         .mount(&server)
         .await;
@@ -183,7 +185,9 @@ async fn create_study_returns_id() {
         .create_study("My Study")
         .visibility("private")
         .cloneable("nobody")
+        .flair("nature.seedling")
         .sticky(false)
+        .description(true)
         .send()
         .await
         .unwrap();
