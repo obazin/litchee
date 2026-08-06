@@ -240,6 +240,53 @@ async fn decline_request_posts_to_the_path() {
 }
 
 #[tokio::test]
+async fn updates_returns_paginated_updates() {
+    let server = MockServer::start().await;
+    let body = r#"{"updates":{"currentPage":1,"maxPerPage":6,
+        "currentPageResults":[{"msg":{"id":"3gJtsRcB","date":1785681992878,
+            "sender":{"id":"thibault","name":"thibault"},
+            "team":{"id":"coders","name":"Coders"},"text":"hello"},"seen":true}],
+        "previousPage":null,"nextPage":2,"nbResults":46,"nbPages":8},
+        "byTeam":[{"last":1785681992878,"team":{"id":"coders","name":"Coders"},
+            "unread":6}]}"#;
+    Mock::given(method("GET"))
+        .and(path("/team/updates"))
+        .and(query_param("page", "1"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let updates = client(&server).teams().updates(Some(1)).await.unwrap();
+
+    assert_eq!(updates.updates.nb_pages, 8);
+    assert_eq!(updates.updates.current_page_results[0].msg.id, "3gJtsRcB");
+    assert_eq!(updates.by_team[0].unread, 6);
+}
+
+#[tokio::test]
+async fn updates_of_team_returns_team_updates() {
+    let server = MockServer::start().await;
+    let body = r#"{"team":{"id":"coders","name":"Coders"},"subscribed":true,
+        "updates":{"currentPage":1,"maxPerPage":6,"currentPageResults":[],
+            "previousPage":null,"nextPage":null,"nbResults":0,"nbPages":1},
+        "byTeam":[]}"#;
+    Mock::given(method("GET"))
+        .and(path("/team/updates/coders"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let of_team = client(&server)
+        .teams()
+        .updates_of_team("coders", None)
+        .await
+        .unwrap();
+
+    assert_eq!(of_team.team.id, "coders");
+    assert!(of_team.subscribed);
+}
+
+#[tokio::test]
 async fn swiss_tournaments_streams() {
     let server = MockServer::start().await;
     let body = "{\"id\":\"a\"}\n{\"id\":\"b\"}\n";
