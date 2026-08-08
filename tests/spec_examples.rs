@@ -102,6 +102,44 @@ async fn team_decodes_spec_example() {
 }
 
 #[tokio::test]
+async fn team_updates_decodes_spec_example() {
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/team/updates",
+        include_str!("fixtures/team_updates.json"),
+    )
+    .await;
+    let updates = client(&server).teams().updates(1).await.unwrap();
+    assert_eq!(updates.updates.nb_results, 46);
+    assert_eq!(updates.updates.current_page_results.len(), 2);
+    assert_eq!(updates.by_team.len(), 2);
+    assert_eq!(updates.by_team[1].unread, 6);
+    let msg = &updates.updates.current_page_results[0].msg;
+    assert_eq!(msg.sender.id, "thibault");
+    assert!(msg.team.is_some(), "update team should decode");
+}
+
+#[tokio::test]
+async fn team_updates_of_team_decodes_spec_example() {
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/team/updates/lichess-chess960",
+        include_str!("fixtures/team_updates_of_team.json"),
+    )
+    .await;
+    let updates = client(&server)
+        .teams()
+        .team_updates("lichess-chess960", 1)
+        .await
+        .unwrap();
+    assert_eq!(updates.team.id, "lichess-chess960");
+    assert!(updates.subscribed);
+    assert_eq!(updates.updates.current_page_results.len(), 1);
+}
+
+#[tokio::test]
 async fn puzzle_decodes_spec_example() {
     let server = MockServer::start().await;
     serve(

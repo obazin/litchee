@@ -203,6 +203,51 @@ async fn message_all_posts_the_message() {
 }
 
 #[tokio::test]
+async fn updates_returns_paginated_updates() {
+    let server = MockServer::start().await;
+    let body = r#"{"updates":{"currentPage":1,"maxPerPage":15,
+        "currentPageResults":[{"msg":{"id":"u1","date":1700000000000,
+        "sender":{"id":"t","name":"T"},"team":{"id":"coders","name":"Coders"},
+        "text":"hello"},"seen":false}],"previousPage":null,"nextPage":null,
+        "nbResults":1,"nbPages":1},
+        "byTeam":[{"team":{"id":"coders","name":"Coders"},"last":1700000000000,"unread":2}]}"#;
+    Mock::given(method("GET"))
+        .and(path("/team/updates"))
+        .and(query_param("page", "1"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let updates = client(&server).teams().updates(1).await.unwrap();
+
+    assert_eq!(updates.updates.current_page_results[0].msg.id, "u1");
+    assert_eq!(updates.by_team[0].unread, 2);
+}
+
+#[tokio::test]
+async fn team_updates_returns_updates_for_one_team() {
+    let server = MockServer::start().await;
+    let body = r#"{"team":{"id":"coders","name":"Coders"},"subscribed":true,
+        "updates":{"currentPage":1,"maxPerPage":15,"currentPageResults":[],
+        "previousPage":null,"nextPage":null,"nbResults":0,"nbPages":1},"byTeam":[]}"#;
+    Mock::given(method("GET"))
+        .and(path("/team/updates/coders"))
+        .and(query_param("page", "2"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let updates = client(&server)
+        .teams()
+        .team_updates("coders", 2)
+        .await
+        .unwrap();
+
+    assert_eq!(updates.team.id, "coders");
+    assert!(updates.subscribed);
+}
+
+#[tokio::test]
 async fn join_requests_returns_requests() {
     let server = MockServer::start().await;
     let body = r#"[{"request":{"teamId":"coders","userId":"mary","date":1,"message":"hi"},
