@@ -429,6 +429,14 @@ pub struct LichessTeamUpdatesByTeamEntry {
     /// The team the summary is about.
     pub team: LichessLightTeam,
     /// The last update's timestamp (Unix milliseconds).
+    ///
+    /// Modelled as `i64` for consistency with the other Unix-ms fields, but
+    /// note that `schemas/TeamUpdatesByTeam.yaml` declares this one as
+    /// `type: number` rather than `type: integer` (unlike
+    /// [`LichessTeamUpdateMessage::date`]). Lichess only ever emits whole
+    /// milliseconds here, so this holds in practice — but a fractional value
+    /// would fail deserialization of the entire response. Switch to `f64` if
+    /// that ever shows up.
     pub last: i64,
     /// The number of unread updates in this team.
     pub unread: u32,
