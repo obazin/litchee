@@ -195,6 +195,22 @@ impl<'a> BroadcastsApi<'a> {
         http::text(request).await
     }
 
+    /// Streams the PGN of all ongoing rounds of a broadcast tournament as games
+    /// are updated (text; stays open while rounds are live).
+    /// `GET /api/stream/broadcast/tour/{broadcastTourId}.pgn`
+    pub async fn stream_tour_pgn(
+        &self,
+        tour_id: &str,
+        options: &PgnExportOptions,
+    ) -> Result<String> {
+        let path = format!("/api/stream/broadcast/tour/{}.pgn", http::segment(tour_id));
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(options);
+        http::text(request).await
+    }
+
     /// Pushes PGN games to a round.
     /// `POST /api/broadcast/round/{roundId}/push`
     pub async fn push_pgn(&self, round_id: &str, pgn: &str) -> Result<LichessBroadcastPushResult> {
