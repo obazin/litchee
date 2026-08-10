@@ -3,6 +3,24 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.1.7](https://github.com/obazin/litchee/releases/tag/v0.1.7) — 2026-08-10
+Changes since [v0.1.6](https://github.com/obazin/litchee/releases/tag/v0.1.6).
+
+
+### Documentation
+- **teams:** Note the spec type mismatch on team update timestamps (#41)
+
+
+### Dependencies & spec
+- Sync client with Lichess API spec 2.0.162 (#40)
+- Sync client to Lichess API spec 2.0.157 (#36)
+- **deps:** Bump reference/lichess-api from 90055ff to 83a54ab (#38)
+- **deps:** Bump reference/lichess-api from 572cea5 to 90055ff (#33)
+- **deps:** Bump base64 from 0.22.1 to 0.23.0 (#34)
+- Bump lichess-api submodule to 90055ff (spec 2.0.154) (#32)
+- Bump lichess-api submodule to 572cea5 (#31)
+- **deps:** Bump the cargo-minor-patch group with 6 updates (#30)
+- **deps:** Bump tokio from 1.52.3 to 1.52.4 in the cargo-minor-patch group (#29)
 ## [v0.1.6](https://github.com/obazin/litchee/releases/tag/v0.1.6) — 2026-07-16
 Changes since [v0.1.5](https://github.com/obazin/litchee/releases/tag/v0.1.5).
 
