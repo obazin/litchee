@@ -446,6 +446,25 @@ mod tests {
     }
 
     #[test]
+    fn serializes_create_study_form() {
+        let form = CreateStudyForm {
+            name: "My Study",
+            visibility: Some("private"),
+            flair: Some("smileys.slightly-smiling-face"),
+            sticky: Some(false),
+            description: Some(true),
+            ..Default::default()
+        };
+        let body = serde_urlencoded::to_string(&form).unwrap();
+        assert!(body.contains("name=My+Study"));
+        assert!(body.contains("flair=smileys.slightly-smiling-face"));
+        assert!(body.contains("sticky=false"));
+        assert!(body.contains("description=true"));
+        // Omitted optional fields must not be serialized.
+        assert!(!body.contains("computer="));
+    }
+
+    #[test]
     fn parses_import_result() {
         let json = r#"{"chapters":[{"id":"iBjmYBya","name":"test 2",
             "players":[{"name":"Carlsen, Magnus","rating":2837},
