@@ -175,6 +175,8 @@ async fn create_study_returns_id() {
         .and(body_string_contains("name=My+Study"))
         .and(body_string_contains("cloneable=nobody"))
         .and(body_string_contains("sticky=false"))
+        .and(body_string_contains("flair=activity.lichess"))
+        .and(body_string_contains("description=true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"id":"abc12345"}"#))
         .mount(&server)
         .await;
@@ -182,8 +184,10 @@ async fn create_study_returns_id() {
         .studies()
         .create_study("My Study")
         .visibility("private")
+        .flair("activity.lichess")
         .cloneable("nobody")
         .sticky(false)
+        .description(true)
         .send()
         .await
         .unwrap();
