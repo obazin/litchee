@@ -74,6 +74,9 @@ impl<'a> BroadcastsApi<'a> {
     /// Streams broadcasts created by a user. `GET /api/broadcast/by/{username}`
     ///
     /// `page` selects a page; `html` embeds rendered descriptions.
+    ///
+    /// Requires an OAuth token with (at least) the
+    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope.
     pub async fn by_user(
         &self,
         username: &str,
@@ -92,6 +95,9 @@ impl<'a> BroadcastsApi<'a> {
     /// Streams the authenticated user's broadcast rounds.
     ///
     /// `nb` limits the number of rounds. `GET /api/broadcast/my-rounds`
+    ///
+    /// Requires an OAuth token with (at least) the
+    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope.
     pub async fn my_rounds(
         &self,
         nb: Option<u32>,
@@ -105,6 +111,9 @@ impl<'a> BroadcastsApi<'a> {
 
     /// Gets a broadcast tournament with its rounds.
     /// `GET /api/broadcast/{broadcastTournamentId}`
+    ///
+    /// Requires an OAuth token with (at least) the
+    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope.
     pub async fn get_tournament(&self, tournament_id: &str) -> Result<LichessBroadcast> {
         let path = format!("/api/broadcast/{}", http::segment(tournament_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
@@ -113,6 +122,9 @@ impl<'a> BroadcastsApi<'a> {
 
     /// Gets a round with its games.
     /// `GET /api/broadcast/{tourSlug}/{roundSlug}/{roundId}`
+    ///
+    /// Requires an OAuth token with (at least) the
+    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope.
     pub async fn round(
         &self,
         tour_slug: &str,
@@ -130,6 +142,9 @@ impl<'a> BroadcastsApi<'a> {
     }
 
     /// Exports a round as PGN. `GET /api/broadcast/round/{roundId}.pgn`
+    ///
+    /// Requires an OAuth token with (at least) the
+    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope.
     pub async fn round_pgn(&self, round_id: &str, options: &PgnExportOptions) -> Result<String> {
         let path = format!("/api/broadcast/round/{}.pgn", http::segment(round_id));
         let request = self
@@ -143,7 +158,8 @@ impl<'a> BroadcastsApi<'a> {
     /// `GET /api/broadcast/{broadcastTournamentId}.pgn`
     ///
     /// For real-time updates about an ongoing tournament, prefer the round PGN
-    /// stream ([`Self::stream_round_pgn`]) or group PGN stream
+    /// stream ([`Self::stream_round_pgn`]), tournament PGN stream
+    /// ([`Self::stream_tour_pgn`]), or group PGN stream
     /// ([`Self::stream_group_pgn`]) instead.
     pub async fn all_rounds_pgn(
         &self,
@@ -160,6 +176,9 @@ impl<'a> BroadcastsApi<'a> {
 
     /// Streams a round's PGN as games are updated (text; stays open while the
     /// round is live). `GET /api/stream/broadcast/round/{roundId}.pgn`
+    ///
+    /// Requires an OAuth token with (at least) the
+    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope.
     pub async fn stream_round_pgn(
         &self,
         round_id: &str,
@@ -179,6 +198,9 @@ impl<'a> BroadcastsApi<'a> {
     /// Streams the PGN of all ongoing rounds of a broadcast group as games are
     /// updated (text; stays open while rounds are live).
     /// `GET /api/stream/broadcast/group/{broadcastGroupId}.pgn`
+    ///
+    /// Requires an OAuth token with (at least) the
+    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope.
     pub async fn stream_group_pgn(
         &self,
         group_id: &str,
@@ -198,6 +220,9 @@ impl<'a> BroadcastsApi<'a> {
     /// Streams the PGN of all ongoing rounds of a broadcast tournament as games
     /// are updated (text; stays open while rounds are live).
     /// `GET /api/stream/broadcast/tour/{broadcastTourId}.pgn`
+    ///
+    /// Requires an OAuth token with (at least) the
+    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope.
     pub async fn stream_tour_pgn(
         &self,
         tour_id: &str,
