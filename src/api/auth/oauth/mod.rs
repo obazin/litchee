@@ -145,17 +145,10 @@ impl<'a> OauthApi<'a> {
     /// Returns [`LichessError::OAuth`] if the token endpoint rejects the
     /// exchange (e.g. `invalid_grant`).
     pub async fn exchange_code(&self, exchange: &CodeExchange<'_>) -> Result<LichessToken> {
-        let form = [
-            ("grant_type", "authorization_code"),
-            ("code", exchange.code),
-            ("code_verifier", exchange.code_verifier.as_str()),
-            ("redirect_uri", exchange.redirect_uri),
-            ("client_id", exchange.client_id),
-        ];
         let response = self
             .client
             .request(Method::POST, Host::Default, "/api/token")
-            .form(&form)
+            .form(&Self::exchange_form(exchange))
             .send()
             .await?;
         let status = response.status();
@@ -165,6 +158,17 @@ impl<'a> OauthApi<'a> {
         } else {
             Err(token_failure(status, &bytes))
         }
+    }
+
+    /// The `application/x-www-form-urlencoded` pairs of a PKCE code exchange.
+    fn exchange_form<'e>(exchange: &'e CodeExchange<'_>) -> [(&'static str, &'e str); 5] {
+        [
+            ("grant_type", "authorization_code"),
+            ("code", exchange.code),
+            ("code_verifier", exchange.code_verifier.as_str()),
+            ("redirect_uri", exchange.redirect_uri),
+            ("client_id", exchange.client_id),
+        ]
     }
 
     /// Revokes the access token the client is currently using.

@@ -2,118 +2,90 @@
 
 use std::fmt;
 
-/// An `OAuth2` scope that an access token may be granted.
+/// Declares every scope once, as `Variant => "wire:format"` pairs, and derives
+/// the enum, [`Scope::ALL`], and [`Scope::as_str`] from that single table.
 ///
-/// Used when building an authorization URL to request specific permissions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum Scope {
+/// Keeping the three in one place means a new scope cannot be half-added: the
+/// generated `as_str` is an exhaustive `match`, so a variant without a wire
+/// string fails to compile, and `ALL`'s declared length has to be updated in
+/// step with the table.
+macro_rules! scopes {
+    ($count:literal: $( $(#[$meta:meta])* $variant:ident => $wire:literal, )+) => {
+        /// An `OAuth2` scope that an access token may be granted.
+        ///
+        /// Used when building an authorization URL to request specific
+        /// permissions.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[non_exhaustive]
+        pub enum Scope {
+            $( $(#[$meta])* $variant, )+
+        }
+
+        impl Scope {
+            /// Every scope, in the order Lichess documents them.
+            pub const ALL: [Scope; $count] = [ $( Scope::$variant, )+ ];
+
+            /// The wire representation, e.g. `"preference:read"`.
+            #[must_use]
+            pub fn as_str(self) -> &'static str {
+                match self {
+                    $( Scope::$variant => $wire, )+
+                }
+            }
+        }
+    };
+}
+
+scopes! { 23:
     /// Read preferences.
-    PreferenceRead,
+    PreferenceRead => "preference:read",
     /// Write preferences.
-    PreferenceWrite,
+    PreferenceWrite => "preference:write",
     /// Read the account email address.
-    EmailRead,
+    EmailRead => "email:read",
     /// Read external engines.
-    EngineRead,
+    EngineRead => "engine:read",
     /// Create, update, and delete external engines.
-    EngineWrite,
+    EngineWrite => "engine:write",
     /// Read incoming challenges.
-    ChallengeRead,
+    ChallengeRead => "challenge:read",
     /// Create, accept, and decline challenges.
-    ChallengeWrite,
+    ChallengeWrite => "challenge:write",
     /// Create, delete, and query bulk pairings.
-    ChallengeBulk,
+    ChallengeBulk => "challenge:bulk",
     /// Read private studies and broadcasts.
-    StudyRead,
+    StudyRead => "study:read",
     /// Create, update, and delete studies and broadcasts.
-    StudyWrite,
+    StudyWrite => "study:write",
     /// Create tournaments.
-    TournamentWrite,
+    TournamentWrite => "tournament:write",
     /// Create and join puzzle races.
-    RacerWrite,
+    RacerWrite => "racer:write",
     /// Read puzzle activity.
-    PuzzleRead,
+    PuzzleRead => "puzzle:read",
     /// Write puzzle activity.
-    PuzzleWrite,
+    PuzzleWrite => "puzzle:write",
     /// Read private team information.
-    TeamRead,
+    TeamRead => "team:read",
     /// Join and leave teams.
-    TeamWrite,
+    TeamWrite => "team:write",
     /// Manage teams (kick members, send PMs).
-    TeamLead,
+    TeamLead => "team:lead",
     /// Read the list of followed players.
-    FollowRead,
+    FollowRead => "follow:read",
     /// Follow and unfollow other players.
-    FollowWrite,
+    FollowWrite => "follow:write",
     /// Send private messages to other players.
-    MsgWrite,
+    MsgWrite => "msg:write",
     /// Play with the Board API.
-    BoardPlay,
+    BoardPlay => "board:play",
     /// Play with the Bot API (bot accounts only).
-    BotPlay,
+    BotPlay => "bot:play",
     /// Use moderator tools, within the bounds of your permissions.
-    WebMod,
+    WebMod => "web:mod",
 }
 
 impl Scope {
-    /// Every scope, in the order Lichess documents them.
-    pub const ALL: [Scope; 23] = [
-        Scope::PreferenceRead,
-        Scope::PreferenceWrite,
-        Scope::EmailRead,
-        Scope::EngineRead,
-        Scope::EngineWrite,
-        Scope::ChallengeRead,
-        Scope::ChallengeWrite,
-        Scope::ChallengeBulk,
-        Scope::StudyRead,
-        Scope::StudyWrite,
-        Scope::TournamentWrite,
-        Scope::RacerWrite,
-        Scope::PuzzleRead,
-        Scope::PuzzleWrite,
-        Scope::TeamRead,
-        Scope::TeamWrite,
-        Scope::TeamLead,
-        Scope::FollowRead,
-        Scope::FollowWrite,
-        Scope::MsgWrite,
-        Scope::BoardPlay,
-        Scope::BotPlay,
-        Scope::WebMod,
-    ];
-
-    /// The wire representation, e.g. `"preference:read"`.
-    #[must_use]
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Scope::PreferenceRead => "preference:read",
-            Scope::PreferenceWrite => "preference:write",
-            Scope::EmailRead => "email:read",
-            Scope::EngineRead => "engine:read",
-            Scope::EngineWrite => "engine:write",
-            Scope::ChallengeRead => "challenge:read",
-            Scope::ChallengeWrite => "challenge:write",
-            Scope::ChallengeBulk => "challenge:bulk",
-            Scope::StudyRead => "study:read",
-            Scope::StudyWrite => "study:write",
-            Scope::TournamentWrite => "tournament:write",
-            Scope::RacerWrite => "racer:write",
-            Scope::PuzzleRead => "puzzle:read",
-            Scope::PuzzleWrite => "puzzle:write",
-            Scope::TeamRead => "team:read",
-            Scope::TeamWrite => "team:write",
-            Scope::TeamLead => "team:lead",
-            Scope::FollowRead => "follow:read",
-            Scope::FollowWrite => "follow:write",
-            Scope::MsgWrite => "msg:write",
-            Scope::BoardPlay => "board:play",
-            Scope::BotPlay => "bot:play",
-            Scope::WebMod => "web:mod",
-        }
-    }
-
     /// Parses a scope from its wire representation.
     #[must_use]
     pub fn parse(value: &str) -> Option<Self> {
@@ -147,5 +119,14 @@ mod tests {
     fn uses_colon_separated_wire_format() {
         assert_eq!(Scope::BoardPlay.as_str(), "board:play");
         assert_eq!(Scope::WebMod.to_string(), "web:mod");
+    }
+
+    #[test]
+    fn wire_strings_are_unique() {
+        let mut wires: Vec<&str> = Scope::ALL.iter().map(|scope| scope.as_str()).collect();
+        wires.sort_unstable();
+        let total = wires.len();
+        wires.dedup();
+        assert_eq!(wires.len(), total, "duplicate wire strings in the table");
     }
 }

@@ -1,5 +1,10 @@
 //! Integration tests for the Bot API.
 
+// Exempt from CLAUDE.md rule 2's 20-line function cap: these long linear
+// arrange/assert tests predate the check (threshold in clippy.toml).
+// Remove this once they are reshaped into smaller cases.
+#![allow(clippy::too_many_lines)]
+
 use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::gameplay::board::{LichessBoardEvent, LichessChatRoom, LichessIncomingEvent};
