@@ -1,5 +1,10 @@
 //! Integration tests for the Relations API.
 
+// CLAUDE.md rule 2 scopes the 20-line function cap to src/; integration
+// tests sit outside that boundary, so a linear arrange/assert case may
+// run long rather than be split for the sake of the count.
+#![allow(clippy::too_many_lines)]
+
 use futures_util::StreamExt;
 use litchee::LichessClient;
 use wiremock::matchers::{method, path};

@@ -2,6 +2,10 @@
 //!
 //! Run with: `LICHESS_TOKEN=lip_xxx cargo run --example profile`
 
+// CLAUDE.md rule 2 scopes the 20-line function cap to src/; examples sit
+// outside that boundary, so a walkthrough may read linearly top-to-bottom.
+#![allow(clippy::too_many_lines)]
+
 use litchee::LichessClient;
 
 #[tokio::main]

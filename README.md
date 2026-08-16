@@ -403,7 +403,9 @@ grouped by category. The tables below map each concern's endpoints to its module
   splitting, error mapping, serde round-trips) has unit tests. CI runs
   `fmt`, `clippy -D warnings`, the test suite, the doc build, and an MSRV check.
 - **Safety & quality gates.** `#![forbid(unsafe_code)]`, clippy `pedantic`,
-  `missing_docs`, and a self-imposed ≤900 LOC/file and ≤20 LOC/method limit.
+  `missing_docs`, and self-imposed size limits enforced in CI: ≤900 LOC per file
+  everywhere, and ≤20 LOC per method across `src/` (integration tests and
+  examples are outside that boundary, being read top-to-bottom).
 
 ### Project layout
 

@@ -2,6 +2,10 @@
 //!
 //! Run with: `cargo run --example tv_feed`
 
+// CLAUDE.md rule 2 scopes the 20-line function cap to src/; examples sit
+// outside that boundary, so a walkthrough may read linearly top-to-bottom.
+#![allow(clippy::too_many_lines)]
+
 use futures_util::StreamExt;
 use litchee::LichessClient;
 
