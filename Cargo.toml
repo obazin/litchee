@@ -24,6 +24,8 @@ exclude = [
     "/.envrc",
     "/clippy.toml",
     "/rustfmt.toml",
+    "/scripts",
+    "/justfile",
     "/flake.nix",
     "/flake.lock",
     "/rust-toolchain.toml",
