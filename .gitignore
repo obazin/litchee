@@ -1,2 +1,6 @@
 /target
 /.cargo
+
+# Materialized by the dev shell as a symlink into the Nix store — the
+# canonical pin lives in github:obazin/rust-projects.
+/rust-toolchain.toml

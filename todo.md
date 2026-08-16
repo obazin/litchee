@@ -3,12 +3,7 @@
 A practical playbook for locking down and documenting `litchee`'s public API,
 tailored to the current crate. Ordered roughly the way it should be done.
 
-> Tooling note: this project gets its toolchain from a **self-contained Nix dev
-> shell** (`flake.nix`). It no longer inherits from `obazin/chess-flake`; the
-> Rust toolchain comes from **fenix** and is pinned to the exact version in
-> `rust-toolchain.toml` (currently **1.95.0**, matching the MSRV and README).
-> Add tools by appending to `devShells.default.packages` in `flake.nix` — **not**
-> `cargo install`. Anything in the pinned nixpkgs is reachable as `pkgs.<tool>`.
+> Tooling note: this project gets its toolchain from the Nix dev shell in `flake.nix`, which consumes the shared **`obazin/rust-projects`** flake. The pin (currently **1.95.0**, matching the MSRV and README) lives there rather than in a `rust-toolchain.toml` of our own, so bumping Rust is one commit in that repo for the whole estate. Add project-specific tools to the `extra` list in `flake.nix` — **not** `cargo install`. Anything in the pinned nixpkgs is reachable as `lib.pkgs.<tool>`.
 >
 > Nightly requirement for the API tooling (verified 2026-06-15): both
 > `cargo public-api` and `cargo-semver-checks` consume **rustdoc JSON**, which is

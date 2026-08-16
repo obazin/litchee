@@ -152,9 +152,7 @@ names** (types, methods, modules). Borrow concepts, not code or identifiers.
 ---
 
 ## Common commands
-The Rust toolchain comes from this project's **standalone** Nix dev shell in
-`flake.nix` (a `fenix` toolchain pinned to `rust-toolchain.toml`; it does **not**
-consume `chess-flake`). Run commands inside it:
+The Rust toolchain comes from the Nix dev shell in `flake.nix`, which consumes the shared [`obazin/rust-projects`](https://github.com/obazin/rust-projects) flake. The pin (1.95.0 — this crate's MSRV) lives there, so bumping Rust moves every project at once; the shell materializes the canonical `rust-toolchain.toml` at the project root as a symlink into the Nix store, which is why the repo carries no copy of its own. Run commands inside it:
 ```bash
 nix develop --command cargo build          # or: direnv allow, then plain cargo
 cargo test                 # unit + integration tests
@@ -162,6 +160,7 @@ cargo nextest run          # same suite via the nextest runner (also in the shel
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt
 git submodule update --init --recursive   # fetch the vendored API spec
+nix flake check            # fmt + clippy + the suite, on the pinned toolchain
 ```
 
 ## Definition of done (per endpoint/task)

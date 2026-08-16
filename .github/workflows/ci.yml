@@ -12,12 +12,11 @@ jobs:
   test:
     name: Test, lint, and docs (stable)
     runs-on: ubuntu-latest
-    # rust-toolchain.toml pins 1.95.0 as a directory override, which would
-    # otherwise win over the stable toolchain installed below — making this job
-    # silently run on the MSRV instead of stable. RUSTUP_TOOLCHAIN outranks the
-    # toml file, so this is what actually gives us current-stable coverage.
-    # (The msrv job has no toml override issue: it runs `cargo check` and the
-    # toml's 1.95.0 matches the toolchain it installs.)
+    # The repo no longer commits a rust-toolchain.toml — the pin lives in the
+    # rust-projects flake and the dev shell materializes it locally, so a
+    # checkout here carries no directory override. RUSTUP_TOOLCHAIN stays as an
+    # explicit statement that this job is the current-stable one, and as a guard
+    # in case a toml ever reappears in the tree.
     env:
       RUSTUP_TOOLCHAIN: stable
     steps:
@@ -71,9 +70,9 @@ jobs:
     #
     # RUSTUP_TOOLCHAIN=stable: the action runs `cargo install cargo-audit`, whose
     # dependency tree now needs rustc >= 1.96 (kstring 2.0.3). This job installs
-    # no toolchain of its own, so rust-toolchain.toml's 1.95.0 directory override
-    # would otherwise win and the install fails to compile. Pointing rustup at
-    # stable outranks the toml (same reasoning as the `test` job above).
+    # no toolchain of its own, so it must not end up on the MSRV — kept explicit
+    # here even though the repo no longer commits a rust-toolchain.toml that
+    # could impose one as a directory override (same reasoning as `test` above).
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       RUSTUP_TOOLCHAIN: stable
