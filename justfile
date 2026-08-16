@@ -10,6 +10,20 @@ repo := "obazin/litchee"
 default:
     @just --list
 
+# --- Size limits (CLAUDE.md rule 2) ------------------------------------------
+
+# Check both halves of the size rule, exactly as CI does.
+check-size: check-file-size check-fn-size
+
+# No tracked .rs file may exceed 900 lines.
+check-file-size:
+    ./scripts/check-file-size.sh
+
+# No function may exceed 20 lines (clippy::too_many_lines, threshold in
+# clippy.toml). Files that opt out carry a file-level allow — grep for it.
+check-fn-size:
+    cargo clippy --all-targets --all-features -- -D warnings
+
 # --- Release automation ------------------------------------------------------
 
 # LEVEL is `patch`, `minor`, or `major`:

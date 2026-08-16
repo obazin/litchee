@@ -21,6 +21,10 @@
 //! LICHESS_CLIENT_ID=com.example.litchee cargo run --example oauth_flow
 //! ```
 
+// Exempt from CLAUDE.md rule 2's 20-line function cap: this walkthrough is
+// deliberately linear so it reads top-to-bottom (threshold in clippy.toml).
+#![allow(clippy::too_many_lines)]
+
 use std::error::Error;
 
 use futures_util::StreamExt;
