@@ -15,12 +15,14 @@ default:
 # Check both halves of the size rule, exactly as CI does.
 check-size: check-file-size check-fn-size
 
-# No tracked .rs file may exceed 900 lines.
+# No .rs file git knows about may exceed 900 physical lines (ignored files
+# and the vendored spec submodule are never enumerated).
 check-file-size:
     ./scripts/check-file-size.sh
 
-# No function may exceed 20 lines (clippy::too_many_lines, threshold in
-# clippy.toml). Files that opt out carry a file-level allow — grep for it.
+# No function under src/ may exceed 20 lines (clippy::too_many_lines, threshold
+# in clippy.toml). tests/ and examples/ are outside the boundary and each carry
+# a file-level allow saying so.
 check-fn-size:
     cargo clippy --all-targets --all-features -- -D warnings
 

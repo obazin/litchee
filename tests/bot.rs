@@ -1,8 +1,8 @@
 //! Integration tests for the Bot API.
 
-// Exempt from CLAUDE.md rule 2's 20-line function cap: these long linear
-// arrange/assert tests predate the check (threshold in clippy.toml).
-// Remove this once they are reshaped into smaller cases.
+// CLAUDE.md rule 2 scopes the 20-line function cap to src/; integration
+// tests sit outside that boundary, so a linear arrange/assert case may
+// run long rather than be split for the sake of the count.
 #![allow(clippy::too_many_lines)]
 
 use futures_util::StreamExt;

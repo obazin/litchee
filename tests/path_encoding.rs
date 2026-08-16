@@ -1,6 +1,11 @@
 //! Integration tests proving caller-supplied path segments are percent-encoded
 //! so a value containing `/`, `?`, or `#` cannot reshape the request path.
 
+// CLAUDE.md rule 2 scopes the 20-line function cap to src/; integration
+// tests sit outside that boundary, so a linear arrange/assert case may
+// run long rather than be split for the sake of the count.
+#![allow(clippy::too_many_lines)]
+
 use litchee::LichessClient;
 use litchee::api::users::players::UserQuery;
 use wiremock::matchers::{method, path};

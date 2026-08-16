@@ -9,6 +9,11 @@
 //! path-injection class fixed earlier. It catches the omission at CI time
 //! without requiring the request layer to be re-architected.
 
+// CLAUDE.md rule 2 scopes the 20-line function cap to src/; integration
+// tests sit outside that boundary, so a linear arrange/assert case may
+// run long rather than be split for the sake of the count.
+#![allow(clippy::too_many_lines)]
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

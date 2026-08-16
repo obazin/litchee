@@ -30,8 +30,11 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all --check
 
-      # The file half of CLAUDE.md rule 2. The function half (20 lines) rides on
-      # clippy::too_many_lines below, whose threshold clippy.toml pins to 20.
+      # The file half of CLAUDE.md rule 2, over every .rs file git knows about
+      # (physical lines, comments included). The function half (20 body lines,
+      # src/ only) rides on clippy::too_many_lines below, whose threshold
+      # clippy.toml pins to 20; tests/ and examples/ sit outside that boundary
+      # and each carry a file-level allow, guarded by tests/size_boundary_guard.rs.
       - name: Enforce the 900-line file cap
         run: ./scripts/check-file-size.sh
 
