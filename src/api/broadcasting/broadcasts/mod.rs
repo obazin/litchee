@@ -79,7 +79,9 @@ impl<'a> BroadcastsApi<'a> {
     /// `page` selects a page; `html` embeds rendered descriptions.
     ///
     /// Requires an OAuth token with (at least) the
-    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope.
+    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope;
+    /// authenticating as `username` also surfaces that user's private and
+    /// unlisted broadcasts.
     pub async fn by_user(
         &self,
         username: &str,
@@ -164,6 +166,10 @@ impl<'a> BroadcastsApi<'a> {
     /// stream ([`Self::stream_round_pgn`]), tournament PGN stream
     /// ([`Self::stream_tour_pgn`]), or group PGN stream
     /// ([`Self::stream_group_pgn`]) instead.
+    ///
+    /// Requires an OAuth token with (at least) the
+    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope; private
+    /// rounds are included when the token's user is a contributor.
     pub async fn all_rounds_pgn(
         &self,
         tournament_id: &str,
