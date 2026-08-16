@@ -53,6 +53,25 @@ impl LineSplitter {
     fn overflowed(&self, max: usize) -> bool {
         self.buffer.len() > max
     }
+
+    /// [`overflowed`](Self::overflowed) as a fallible check, so the streaming
+    /// loop can propagate the guard with `?`.
+    fn check_overflow(&self, max: usize) -> Result<()> {
+        if self.overflowed(max) {
+            return Err(StreamError::LineTooLong { max }.into());
+        }
+        Ok(())
+    }
+}
+
+/// Parses the unterminated remainder left when the body ends without a final
+/// newline. Keep-alive whitespace yields `Ok(None)`.
+fn trailing_item<T: DeserializeOwned>(splitter: LineSplitter) -> Result<Option<T>> {
+    let parsed = splitter
+        .finish()
+        .map(|line| parse_line(&line))
+        .transpose()?;
+    Ok(parsed.flatten())
 }
 
 /// Parses one NDJSON line. Blank/whitespace-only lines (keep-alives) yield
@@ -84,8 +103,7 @@ where
         let mut splitter = LineSplitter::default();
         futures_util::pin_mut!(bytes);
         while let Some(chunk) = bytes.next().await {
-            let chunk = chunk.map_err(StreamError::Transport)?;
-            splitter.push(&chunk);
+            splitter.push(&chunk.map_err(StreamError::Transport)?);
             while let Some(newline) = splitter.line_end() {
                 let parsed = parse_line(splitter.line(newline))?;
                 splitter.consume(newline);
@@ -93,16 +111,9 @@ where
                     yield item;
                 }
             }
-            if splitter.overflowed(max_line_bytes) {
-                Err(StreamError::LineTooLong { max: max_line_bytes })?;
-            }
+            splitter.check_overflow(max_line_bytes)?;
         }
-        // Flatten the trailing-line logic into a single `if let`: let-chains
-        // (Rust 2024) aren't usable here because `async_stream` parses this body
-        // under its own edition, and a nested `if let` would trip
-        // `clippy::collapsible_if`.
-        let trailing = splitter.finish().map(|line| parse_line(&line)).transpose()?;
-        if let Some(item) = trailing.flatten() {
+        if let Some(item) = trailing_item(splitter)? {
             yield item;
         }
     }
@@ -144,6 +155,35 @@ mod tests {
         splitter.push(b"\n");
         let _ = take_line(&mut splitter);
         assert!(!splitter.overflowed(0));
+    }
+
+    #[test]
+    fn check_overflow_reports_the_cap_it_tripped() {
+        let mut splitter = LineSplitter::default();
+        splitter.push(b"abcde");
+        assert!(splitter.check_overflow(5).is_ok());
+        let error = splitter.check_overflow(4).unwrap_err();
+        assert!(matches!(
+            error,
+            crate::error::LichessError::Stream(StreamError::LineTooLong { max: 4 })
+        ));
+    }
+
+    #[test]
+    fn trailing_item_decodes_or_skips_the_remainder() {
+        let mut splitter = LineSplitter::default();
+        splitter.push(b"{\"x\":1}");
+        let value: Option<Value> = trailing_item(splitter).unwrap();
+        assert_eq!(value, Some(serde_json::json!({"x": 1})));
+
+        assert!(
+            trailing_item::<Value>(LineSplitter::default())
+                .unwrap()
+                .is_none()
+        );
+        let mut blank = LineSplitter::default();
+        blank.push(b"  ");
+        assert!(trailing_item::<Value>(blank).unwrap().is_none());
     }
 
     #[test]
