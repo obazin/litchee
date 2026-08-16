@@ -3,6 +3,13 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.1.8](https://github.com/obazin/litchee/releases/tag/v0.1.8) — 2026-08-16
+Changes since [v0.1.7](https://github.com/obazin/litchee/releases/tag/v0.1.7).
+
+
+### Dependencies & spec
+- Sync Lichess API spec to 2.0.163 (broadcast study:read auth) (#43)
+- **deps:** Bump the cargo-minor-patch group with 2 updates (#42)
 ## [v0.1.7](https://github.com/obazin/litchee/releases/tag/v0.1.7) — 2026-08-10
 Changes since [v0.1.6](https://github.com/obazin/litchee/releases/tag/v0.1.6).
 
