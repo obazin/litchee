@@ -65,6 +65,11 @@ pub struct LichessBroadcastRoundInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished_at: Option<i64>,
     /// Whether the round has finished.
+    ///
+    /// Deprecated by the Lichess API (spec 2.0.164); prefer
+    /// [`finished_at`](Self::finished_at) to determine whether the round has
+    /// finished.
+    #[deprecated(note = "deprecated by the Lichess API; use `finished_at` instead")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished: Option<bool>,
 }
@@ -92,14 +97,28 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(deprecated)] // exercises the deprecated `finished` field on purpose
     fn parses_broadcast_with_rounds() {
         let json = r#"{"tour":{"id":"abc","name":"World Champ","slug":"wc"},
             "rounds":[{"id":"r1","name":"Round 1","slug":"round-1","url":"u",
-                       "createdAt":1,"rated":true,"finished":false}]}"#;
+                       "createdAt":1,"rated":true,"finishedAt":42,"finished":true}]}"#;
         let broadcast: LichessBroadcast = serde_json::from_str(json).unwrap();
         assert_eq!(broadcast.tour.name, "World Champ");
         assert_eq!(broadcast.rounds[0].id, "r1");
-        assert_eq!(broadcast.rounds[0].finished, Some(false));
+        assert_eq!(broadcast.rounds[0].finished_at, Some(42));
+        // `finished` is deprecated upstream but must still deserialize.
+        assert_eq!(broadcast.rounds[0].finished, Some(true));
+    }
+
+    #[test]
+    fn parses_round_without_optional_rated() {
+        // `rated` was dropped from the schema's required list in spec 2.0.164,
+        // so a round payload may omit it entirely.
+        let json = r#"{"tour":{"id":"abc","name":"World Champ","slug":"wc"},
+            "rounds":[{"id":"r1","name":"Round 1","slug":"round-1","url":"u",
+                       "createdAt":1}]}"#;
+        let broadcast: LichessBroadcast = serde_json::from_str(json).unwrap();
+        assert_eq!(broadcast.rounds[0].rated, None);
     }
 }
 
