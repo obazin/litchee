@@ -65,6 +65,10 @@ pub struct LichessBroadcastRoundInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished_at: Option<i64>,
     /// Whether the round has finished.
+    ///
+    /// **Deprecated** upstream (Lichess API): rely on
+    /// [`finished_at`](Self::finished_at) being set instead of this flag.
+    #[deprecated(note = "deprecated by the Lichess API; use `finished_at` instead")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished: Option<bool>,
 }
@@ -92,6 +96,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(deprecated)] // exercises the deprecated `finished` field on purpose
     fn parses_broadcast_with_rounds() {
         let json = r#"{"tour":{"id":"abc","name":"World Champ","slug":"wc"},
             "rounds":[{"id":"r1","name":"Round 1","slug":"round-1","url":"u",
@@ -100,6 +105,19 @@ mod tests {
         assert_eq!(broadcast.tour.name, "World Champ");
         assert_eq!(broadcast.rounds[0].id, "r1");
         assert_eq!(broadcast.rounds[0].finished, Some(false));
+    }
+
+    #[test]
+    #[allow(deprecated)] // asserts the deprecated `finished` field defaults to None
+    fn parses_round_without_rated_or_finished() {
+        // Per the spec, `rated` is no longer required and `finished` is
+        // deprecated; a round omitting both must still deserialize.
+        let json = r#"{"tour":{"id":"abc","name":"Champ","slug":"c"},
+            "rounds":[{"id":"r1","name":"Round 1","slug":"round-1","url":"u",
+                       "createdAt":1}]}"#;
+        let broadcast: LichessBroadcast = serde_json::from_str(json).unwrap();
+        assert_eq!(broadcast.rounds[0].rated, None);
+        assert_eq!(broadcast.rounds[0].finished, None);
     }
 }
 
