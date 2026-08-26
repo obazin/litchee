@@ -3,6 +3,22 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.1.9](https://github.com/obazin/litchee/releases/tag/v0.1.9) — 2026-08-26
+Changes since [v0.1.8](https://github.com/obazin/litchee/releases/tag/v0.1.8).
+
+
+### Fixes
+- **deps:** Bump h2 to 0.4.16 to address RUSTSEC-2026-0258 (#48)
+
+
+### Documentation
+- Scope the 20-line function cap to src/ (#45)
+
+
+### Dependencies & spec
+- Sync Lichess API spec to v2.0.166 (drop BroadcastRoundInfo.createdAt/delay) (#50)
+- Sync Lichess API spec to v2.0.165 (BroadcastRoundInfo.finished deprecated) (#49)
+- **deps:** Bump the cargo-minor-patch group with 2 updates (#46)
 ## [v0.1.8](https://github.com/obazin/litchee/releases/tag/v0.1.8) — 2026-08-16
 Changes since [v0.1.7](https://github.com/obazin/litchee/releases/tag/v0.1.7).
 
