@@ -85,6 +85,21 @@ pub struct LichessGameMoveAnalysis {
     pub judgment: Option<LichessMoveJudgment>,
 }
 
+/// Accuracy percentages broken down by game phase.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessAnalysisPhases {
+    /// Accuracy during the opening.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening: Option<u32>,
+    /// Accuracy during the middlegame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub middlegame: Option<u32>,
+    /// Accuracy during the endgame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endgame: Option<u32>,
+}
+
 /// Aggregate analysis statistics for one player in a game.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -100,9 +115,17 @@ pub struct LichessPlayerAnalysis {
     /// Accuracy percentage, when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accuracy: Option<u32>,
+    /// Per-phase accuracy breakdown, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phases: Option<LichessAnalysisPhases>,
 }
 
 /// One side of a game.
+///
+/// The API models each side as a union of a human side (carrying
+/// [`user`](Self::user) and [`rating`](Self::rating)) and a Stockfish AI side
+/// (carrying [`ai_level`](Self::ai_level)); the two arms are merged here, with
+/// only the fields relevant to a given side present.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -427,6 +450,28 @@ mod tests {
         let game: LichessGame =
             serde_json::from_str(r#"{"id":"x","status":"variantEnd"}"#).unwrap();
         assert_eq!(game.status, Some(LichessGameStatusName::VariantEnd));
+    }
+
+    #[test]
+    fn parses_player_analysis_with_phases() {
+        let json = r#"{
+            "id":"g",
+            "players":{
+                "white":{"user":{"id":"a","name":"A"},"rating":1600,
+                    "analysis":{"inaccuracy":1,"mistake":2,"blunder":0,"acpl":25,
+                        "accuracy":88,"phases":{"opening":95,"middlegame":80,"endgame":90}}},
+                "black":{"aiLevel":5,
+                    "analysis":{"inaccuracy":0,"mistake":1,"blunder":1,"acpl":40}}
+            }
+        }"#;
+        let game: LichessGame = serde_json::from_str(json).unwrap();
+        let players = game.players.unwrap();
+        let phases = players.white.analysis.unwrap().phases.unwrap();
+        assert_eq!(phases.opening, Some(95));
+        assert_eq!(phases.middlegame, Some(80));
+        assert_eq!(phases.endgame, Some(90));
+        assert_eq!(players.black.ai_level, Some(5));
+        assert!(players.black.analysis.unwrap().phases.is_none());
     }
 
     #[test]
