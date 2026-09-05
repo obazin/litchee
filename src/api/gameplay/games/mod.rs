@@ -18,11 +18,11 @@ pub use export::{
     UserGamesRequest,
 };
 pub use model::{
-    LichessGame, LichessGameArenaTour, LichessGameChatMessage, LichessGameClock,
-    LichessGameDivision, LichessGameMoveAnalysis, LichessGameMoveUpdate, LichessGameOpening,
-    LichessGamePlayer, LichessGamePlayers, LichessGameStatusName, LichessGameSwissTour,
-    LichessImportedGame, LichessMoveJudgment, LichessNowPlaying, LichessNowPlayingGame,
-    LichessNowPlayingOpponent, LichessPlayerAnalysis,
+    LichessAnalysisPhases, LichessGame, LichessGameArenaTour, LichessGameChatMessage,
+    LichessGameClock, LichessGameDivision, LichessGameMoveAnalysis, LichessGameMoveUpdate,
+    LichessGameOpening, LichessGamePlayer, LichessGamePlayers, LichessGameStatusName,
+    LichessGameSwissTour, LichessImportedGame, LichessMoveJudgment, LichessNowPlaying,
+    LichessNowPlayingGame, LichessNowPlayingOpponent, LichessPlayerAnalysis,
 };
 
 /// Accessor for the Games API.

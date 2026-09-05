@@ -85,6 +85,21 @@ pub struct LichessGameMoveAnalysis {
     pub judgment: Option<LichessMoveJudgment>,
 }
 
+/// Per-phase accuracy breakdown for a player's game analysis.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessAnalysisPhases {
+    /// Opening accuracy percentage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening: Option<u32>,
+    /// Middlegame accuracy percentage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub middlegame: Option<u32>,
+    /// Endgame accuracy percentage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endgame: Option<u32>,
+}
+
 /// Aggregate analysis statistics for one player in a game.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -100,9 +115,19 @@ pub struct LichessPlayerAnalysis {
     /// Accuracy percentage, when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accuracy: Option<u32>,
+    /// Per-phase accuracy breakdown, when available (human players only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phases: Option<LichessAnalysisPhases>,
 }
 
 /// One side of a game.
+///
+/// The Lichess spec models a side as a union of a human player (`user`,
+/// `rating`, …) and an AI player (`aiLevel`). This flat struct is the
+/// superset of both branches: fields specific to one branch are optional and
+/// absent for the other (a human side leaves [`ai_level`](Self::ai_level)
+/// unset; an AI side leaves [`user`](Self::user) and
+/// [`rating`](Self::rating) unset).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -438,5 +463,28 @@ mod tests {
         assert_eq!(arena.id.as_deref(), Some("abc"));
         assert_eq!(arena.name.as_deref(), Some("Hourly"));
         assert_eq!(game.swiss_tour.unwrap().id.as_deref(), Some("xyz"));
+    }
+
+    #[test]
+    fn parses_player_analysis_with_phase_accuracy() {
+        let json = r#"{"inaccuracy":1,"mistake":0,"blunder":2,"acpl":35,
+            "accuracy":88,"phases":{"opening":95,"middlegame":80,"endgame":90}}"#;
+        let analysis: LichessPlayerAnalysis = serde_json::from_str(json).unwrap();
+        let phases = analysis.phases.unwrap();
+        assert_eq!(phases.opening, Some(95));
+        assert_eq!(phases.middlegame, Some(80));
+        assert_eq!(phases.endgame, Some(90));
+    }
+
+    #[test]
+    fn parses_ai_side_without_user_or_phases() {
+        // An AI side carries `aiLevel` instead of `user`/`rating`, and its
+        // analysis has no per-phase breakdown.
+        let json = r#"{"aiLevel":5,"analysis":{"inaccuracy":0,"mistake":1,
+            "blunder":0,"acpl":12}}"#;
+        let side: LichessGamePlayer = serde_json::from_str(json).unwrap();
+        assert_eq!(side.ai_level, Some(5));
+        assert!(side.user.is_none());
+        assert!(side.analysis.unwrap().phases.is_none());
     }
 }
