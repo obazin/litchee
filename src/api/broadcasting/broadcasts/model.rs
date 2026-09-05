@@ -49,6 +49,9 @@ pub struct LichessBroadcastRoundInfo {
     /// The canonical URL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    /// Creation time (Unix milliseconds).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<i64>,
     /// Whether the round is rated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rated: Option<bool>,
@@ -97,10 +100,11 @@ mod tests {
     fn parses_broadcast_with_rounds() {
         let json = r#"{"tour":{"id":"abc","name":"World Champ","slug":"wc"},
             "rounds":[{"id":"r1","name":"Round 1","slug":"round-1","url":"u",
-                       "rated":true,"finished":false}]}"#;
+                       "createdAt":1514505150384,"rated":true,"finished":false}]}"#;
         let broadcast: LichessBroadcast = serde_json::from_str(json).unwrap();
         assert_eq!(broadcast.tour.name, "World Champ");
         assert_eq!(broadcast.rounds[0].id, "r1");
+        assert_eq!(broadcast.rounds[0].created_at, Some(1_514_505_150_384));
         assert_eq!(broadcast.rounds[0].finished, Some(false));
     }
 
