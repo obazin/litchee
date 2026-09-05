@@ -3,6 +3,13 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.1.10](https://github.com/obazin/litchee/releases/tag/v0.1.10) — 2026-09-05
+Changes since [v0.1.9](https://github.com/obazin/litchee/releases/tag/v0.1.9).
+
+
+### Dependencies & spec
+- Sync Lichess API spec to v2.0.169
+- **deps:** Bump chacha20 0.10.0 -> 0.10.2 (yanked release)
 ## [v0.1.9](https://github.com/obazin/litchee/releases/tag/v0.1.9) — 2026-08-26
 Changes since [v0.1.8](https://github.com/obazin/litchee/releases/tag/v0.1.8).
 
