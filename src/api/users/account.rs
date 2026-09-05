@@ -12,7 +12,7 @@ use crate::client::LichessClient;
 use crate::config::Host;
 use crate::error::Result;
 use crate::http;
-use crate::model::{LichessLightUser, LichessUserExtended};
+use crate::model::LichessUserExtended;
 
 /// Internal decode shape for `GET /api/account/email`.
 #[derive(Debug, Deserialize)]
@@ -93,19 +93,6 @@ impl<'a> AccountApi<'a> {
             .request(Method::GET, Host::Default, "/api/account/preferences");
         http::json(request, "LichessPreferences").await
     }
-
-    /// Gets the authenticated user's timeline.
-    ///
-    /// `since` returns only entries after this timestamp (ms); `nb` limits the
-    /// number of entries. `GET /api/timeline`
-    pub async fn timeline(&self, since: Option<i64>, nb: Option<u32>) -> Result<LichessTimeline> {
-        let request = self
-            .client
-            .request(Method::GET, Host::Default, "/api/timeline")
-            .query(&[("since", since)])
-            .query(&[("nb", nb)]);
-        http::json(request, "LichessTimeline").await
-    }
 }
 
 impl LichessClient {
@@ -152,36 +139,6 @@ pub struct LichessPreferences {
     pub language: Option<String>,
 }
 
-/// A single entry in the user's timeline.
-///
-/// The discriminant is in [`entry_type`](Self::entry_type); entry-specific
-/// fields are preserved in [`data`](Self::data).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub struct LichessTimelineEntry {
-    /// The entry type (e.g. `"follow"`, `"game-end"`).
-    #[serde(rename = "type")]
-    pub entry_type: String,
-    /// When the entry occurred (Unix milliseconds).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub date: Option<i64>,
-    /// The entry-specific payload.
-    #[serde(flatten)]
-    pub data: HashMap<String, Value>,
-}
-
-/// The authenticated user's timeline. `GET /api/timeline`
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub struct LichessTimeline {
-    /// The timeline entries.
-    #[serde(default)]
-    pub entries: Vec<LichessTimelineEntry>,
-    /// Light user info for the users referenced by the entries.
-    #[serde(default)]
-    pub users: HashMap<String, LichessLightUser>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,15 +151,5 @@ mod tests {
         assert_eq!(prefs.prefs.theme.as_deref(), Some("blue"));
         assert_eq!(prefs.language.as_deref(), Some("en-GB"));
         assert_eq!(prefs.prefs.other.get("zen"), Some(&Value::from(1)));
-    }
-
-    #[test]
-    fn parses_timeline_entry() {
-        let json = r#"{"entries":[{"type":"follow","date":1,"u1":"a","u2":"b"}],
-            "users":{"a":{"id":"a","name":"A"}}}"#;
-        let timeline: LichessTimeline = serde_json::from_str(json).unwrap();
-        assert_eq!(timeline.entries[0].entry_type, "follow");
-        assert_eq!(timeline.entries[0].data.get("u1"), Some(&Value::from("a")));
-        assert_eq!(timeline.users["a"].name, "A");
     }
 }

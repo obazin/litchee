@@ -233,9 +233,9 @@ grouped by category. The tables below map each concern's endpoints to its module
 <details>
 <summary><b>Users</b></summary>
 
-**`client.account()`** — `litchee::api::users::account`  (6 endpoints)
+**`client.account()`** — `litchee::api::users::account`  (5 endpoints)
 
-`GET /api/account`, `GET /api/account/email`, `GET /api/account/preferences`, `GET /api/account/kid`, `POST /api/account/kid`, `GET /api/timeline`
+`GET /api/account`, `GET /api/account/email`, `GET /api/account/preferences`, `GET /api/account/kid`, `POST /api/account/kid`
 
 **`client.users()`** — `litchee::api::users::players`  (13 endpoints)
 

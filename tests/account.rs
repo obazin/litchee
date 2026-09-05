@@ -124,22 +124,3 @@ async fn preferences_returns_typed_and_extra_fields() {
     assert_eq!(prefs.language.as_deref(), Some("en-GB"));
     assert_eq!(prefs.prefs.theme.as_deref(), Some("blue"));
 }
-
-#[tokio::test]
-async fn timeline_returns_entries() {
-    let server = MockServer::start().await;
-    let body = r#"{"entries":[{"type":"follow","date":1}],"users":{}}"#;
-    Mock::given(method("GET"))
-        .and(path("/api/timeline"))
-        .and(query_param("since", "1700000000000"))
-        .and(query_param("nb", "15"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(body))
-        .mount(&server)
-        .await;
-    let timeline = client(&server)
-        .account()
-        .timeline(Some(1_700_000_000_000), Some(15))
-        .await
-        .unwrap();
-    assert_eq!(timeline.entries[0].entry_type, "follow");
-}
