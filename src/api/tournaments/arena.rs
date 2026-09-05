@@ -640,6 +640,9 @@ pub struct LichessArenaPlayer {
     /// The player's title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<LichessTitle>,
+    /// The player's real name, when the tournament discloses it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub real_name: Option<String>,
     /// The player's current rank.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rank: Option<u32>,
@@ -755,10 +758,13 @@ mod tests {
     #[test]
     fn parses_full_arena_ignoring_unknown_aggregates() {
         let json = r#"{"id":"abc","fullName":"Hourly","nbPlayers":50,
-            "standing":{"page":1,"players":[{"name":"A","rank":1,"score":10}]},
+            "standing":{"page":1,"players":[{"name":"A","rank":1,"score":10,
+                "realName":"Alice Adams"}]},
             "duels":[{"whatever":true}],"stats":{"games":100}}"#;
         let full: LichessArenaFull = serde_json::from_str(json).unwrap();
-        assert_eq!(full.standing.unwrap().players[0].name, "A");
+        let player = &full.standing.unwrap().players[0];
+        assert_eq!(player.name, "A");
+        assert_eq!(player.real_name.as_deref(), Some("Alice Adams"));
     }
 
     #[test]
