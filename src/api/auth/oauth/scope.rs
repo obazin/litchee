@@ -36,7 +36,7 @@ macro_rules! scopes {
     };
 }
 
-scopes! { 23:
+scopes! { 24:
     /// Read preferences.
     PreferenceRead => "preference:read",
     /// Write preferences.
@@ -77,6 +77,8 @@ scopes! { 23:
     FollowWrite => "follow:write",
     /// Send private messages to other players.
     MsgWrite => "msg:write",
+    /// Write notes on other players.
+    NoteWrite => "note:write",
     /// Play with the Board API.
     BoardPlay => "board:play",
     /// Play with the Bot API (bot accounts only).
@@ -119,6 +121,12 @@ mod tests {
     fn uses_colon_separated_wire_format() {
         assert_eq!(Scope::BoardPlay.as_str(), "board:play");
         assert_eq!(Scope::WebMod.to_string(), "web:mod");
+        assert_eq!(Scope::NoteWrite.as_str(), "note:write");
+    }
+
+    #[test]
+    fn parses_note_write_scope() {
+        assert_eq!(Scope::parse("note:write"), Some(Scope::NoteWrite));
     }
 
     #[test]
