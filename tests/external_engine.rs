@@ -121,6 +121,8 @@ async fn submit_work_posts_output() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/api/external-engine/work/w1"))
+        .and(body_string_contains("info depth 1"))
+        .and(body_string_contains("bestmove e2e4"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"ok":true}"#))
         .mount(&server)
         .await;

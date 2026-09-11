@@ -116,6 +116,9 @@ impl<'a> ExternalEngineApi<'a> {
     /// Submits engine analysis output for a unit of work. Served from
     /// `engine.lichess.ovh`.
     ///
+    /// `output` is the raw UCI text: `info` lines followed by a final
+    /// `bestmove` (a move or `(none)`, optionally with a `ponder` move).
+    ///
     /// `POST /api/external-engine/work/{id}`
     pub async fn submit_work(&self, work_id: &str, output: &str) -> Result<()> {
         let path = format!("/api/external-engine/work/{}", http::segment(work_id));
