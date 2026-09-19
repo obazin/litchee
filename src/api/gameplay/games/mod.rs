@@ -20,9 +20,9 @@ pub use export::{
 pub use model::{
     LichessAnalysisPhases, LichessGame, LichessGameArenaTour, LichessGameChatMessage,
     LichessGameClock, LichessGameDivision, LichessGameMoveAnalysis, LichessGameMoveUpdate,
-    LichessGameOpening, LichessGamePlayer, LichessGamePlayers, LichessGameStatusName,
-    LichessGameSwissTour, LichessImportedGame, LichessMoveJudgment, LichessNowPlaying,
-    LichessNowPlayingGame, LichessNowPlayingOpponent, LichessPlayerAnalysis,
+    LichessGameOpening, LichessGamePlayer, LichessGamePlayers, LichessGameStatus,
+    LichessGameStatusName, LichessGameSwissTour, LichessImportedGame, LichessMoveJudgment,
+    LichessNowPlaying, LichessNowPlayingGame, LichessNowPlayingOpponent, LichessPlayerAnalysis,
 };
 
 /// Accessor for the Games API.
