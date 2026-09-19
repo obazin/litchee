@@ -41,6 +41,19 @@ pub enum LichessGameStatusName {
     VariantEnd,
 }
 
+/// A game's status as the API's numeric-id / name pair. Schema `GameStatus`.
+///
+/// The [`id`](Self::id) is one of the Lichess status codes
+/// (`10, 20, 25, 30..=39, 60`); [`name`](Self::name) is its symbolic form.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessGameStatus {
+    /// The numeric status code.
+    pub id: u32,
+    /// The symbolic status name.
+    pub name: LichessGameStatusName,
+}
+
 /// The opening of a game.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -298,23 +311,79 @@ pub struct LichessImportedGame {
 }
 
 /// The opponent in a [`LichessNowPlayingGame`].
+///
+/// The API returns one of three shapes (spec `oneOf`): a registered
+/// [`Player`](Self::Player) (non-null id), a computer
+/// [`Ai`](Self::Ai) opponent (null id, with an AI level), or an
+/// [`Anonymous`](Self::Anonymous) opponent (null id, no rating).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", untagged)]
 #[non_exhaustive]
-pub struct LichessNowPlayingOpponent {
-    /// The opponent's id.
-    pub id: String,
-    /// The opponent's username.
-    pub username: String,
-    /// The opponent's rating.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rating: Option<u32>,
-    /// The opponent's rating change.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rating_diff: Option<i32>,
-    /// The AI level, if playing the computer.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ai: Option<u32>,
+pub enum LichessNowPlayingOpponent {
+    /// A registered player, identified by a non-null id.
+    Player {
+        /// The opponent's id.
+        id: String,
+        /// The opponent's username.
+        username: String,
+        /// The opponent's rating, if rated.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rating: Option<u32>,
+        /// The opponent's rating change, if any.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rating_diff: Option<i32>,
+    },
+    /// A computer opponent (null id) at a given AI level.
+    Ai {
+        /// The opponent's display name (e.g. `"Stockfish level 1"`).
+        username: String,
+        /// The AI level, from 1 to 8.
+        ai: u32,
+    },
+    /// An anonymous opponent (null id, no rating).
+    Anonymous {
+        /// The opponent's display name.
+        username: String,
+    },
+}
+
+impl LichessNowPlayingOpponent {
+    /// The opponent's username, present in every variant.
+    #[must_use]
+    pub fn username(&self) -> &str {
+        match self {
+            Self::Player { username, .. }
+            | Self::Ai { username, .. }
+            | Self::Anonymous { username } => username,
+        }
+    }
+
+    /// The opponent's id, present only for a registered [`Player`](Self::Player).
+    #[must_use]
+    pub fn id(&self) -> Option<&str> {
+        match self {
+            Self::Player { id, .. } => Some(id),
+            Self::Ai { .. } | Self::Anonymous { .. } => None,
+        }
+    }
+
+    /// The opponent's rating, present only for a rated registered player.
+    #[must_use]
+    pub fn rating(&self) -> Option<u32> {
+        match self {
+            Self::Player { rating, .. } => *rating,
+            Self::Ai { .. } | Self::Anonymous { .. } => None,
+        }
+    }
+
+    /// The AI level, present only for a computer [`Ai`](Self::Ai) opponent.
+    #[must_use]
+    pub fn ai(&self) -> Option<u32> {
+        match self {
+            Self::Ai { ai, .. } => Some(*ai),
+            Self::Player { .. } | Self::Anonymous { .. } => None,
+        }
+    }
 }
 
 /// A game the authenticated user is currently playing.
@@ -347,6 +416,12 @@ pub struct LichessNowPlayingGame {
     /// Whether the game is rated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rated: Option<bool>,
+    /// The authenticated user's rating in this game.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rating: Option<u32>,
+    /// The game's status (id/name pair), if reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<LichessGameStatus>,
     /// Seconds left on the user's clock.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seconds_left: Option<i64>,
@@ -474,6 +549,45 @@ mod tests {
         assert_eq!(phases.opening, Some(95));
         assert_eq!(phases.middlegame, Some(80));
         assert_eq!(phases.endgame, Some(90));
+    }
+
+    #[test]
+    fn parses_now_playing_registered_opponent_with_status_and_rating() {
+        let json = r#"{"nbMyTurn":0,"nowPlaying":[{"gameId":"g","fullId":"gf",
+            "color":"black","fen":"x","opponent":{"id":"mary","username":"Mary",
+            "rating":1007},"rating":1700,"status":{"id":20,"name":"started"}}]}"#;
+        let playing: LichessNowPlaying = serde_json::from_str(json).unwrap();
+        let game = &playing.now_playing[0];
+        assert_eq!(game.rating, Some(1700));
+        assert_eq!(game.status.unwrap().id, 20);
+        assert_eq!(game.status.unwrap().name, LichessGameStatusName::Started);
+        let opp = &game.opponent;
+        assert_eq!(opp.id(), Some("mary"));
+        assert_eq!(opp.username(), "Mary");
+        assert_eq!(opp.rating(), Some(1007));
+        assert_eq!(opp.ai(), None);
+        assert!(matches!(opp, LichessNowPlayingOpponent::Player { .. }));
+    }
+
+    #[test]
+    fn parses_now_playing_ai_opponent() {
+        let json = r#"{"ai":1,"id":null,"username":"Stockfish level 1"}"#;
+        let opp: LichessNowPlayingOpponent = serde_json::from_str(json).unwrap();
+        assert_eq!(opp.ai(), Some(1));
+        assert_eq!(opp.username(), "Stockfish level 1");
+        assert_eq!(opp.id(), None);
+        assert_eq!(opp.rating(), None);
+        assert!(matches!(opp, LichessNowPlayingOpponent::Ai { .. }));
+    }
+
+    #[test]
+    fn parses_now_playing_anonymous_opponent() {
+        let opp: LichessNowPlayingOpponent =
+            serde_json::from_str(r#"{"id":null,"username":"Anon."}"#).unwrap();
+        assert_eq!(opp.username(), "Anon.");
+        assert_eq!(opp.id(), None);
+        assert_eq!(opp.ai(), None);
+        assert!(matches!(opp, LichessNowPlayingOpponent::Anonymous { .. }));
     }
 
     #[test]
