@@ -28,7 +28,9 @@ async fn list_returns_pairings() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/api/bulk-pairing"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(format!("[{PAIRING}]")))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(format!(r#"{{"bulks":[{PAIRING}]}}"#)),
+        )
         .mount(&server)
         .await;
 

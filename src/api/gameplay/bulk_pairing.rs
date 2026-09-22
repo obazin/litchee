@@ -30,7 +30,8 @@ impl<'a> BulkPairingApi<'a> {
         let request = self
             .client
             .request(Method::GET, Host::Default, "/api/bulk-pairing");
-        http::json(request, "Vec<LichessBulkPairing>").await
+        let page: LichessBulkPairings = http::json(request, "LichessBulkPairings").await?;
+        Ok(page.bulks)
     }
 
     /// Gets a bulk pairing by id. `GET /api/bulk-pairing/{id}`
@@ -272,6 +273,15 @@ pub struct LichessBulkPairingGame {
     pub black: Option<String>,
 }
 
+/// A page of bulk pairings returned by `GET /api/bulk-pairing`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessBulkPairings {
+    /// The bulk pairings.
+    #[serde(default)]
+    pub bulks: Vec<LichessBulkPairing>,
+}
+
 /// A bulk pairing: a batch of games created together.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -320,5 +330,19 @@ mod tests {
         assert_eq!(pairing.games.len(), 1);
         assert_eq!(pairing.paired_at, None);
         assert_eq!(pairing.clock.unwrap().limit, Some(300));
+    }
+
+    #[test]
+    fn parses_bulk_pairings_list_wrapper() {
+        let json = r#"{"bulks":[{"id":"RVAcwgg7","games":[]},{"id":"KT8374ut","games":[]}]}"#;
+        let page: LichessBulkPairings = serde_json::from_str(json).unwrap();
+        assert_eq!(page.bulks.len(), 2);
+        assert_eq!(page.bulks[0].id, "RVAcwgg7");
+    }
+
+    #[test]
+    fn parses_empty_bulk_pairings_list() {
+        let page: LichessBulkPairings = serde_json::from_str("{}").unwrap();
+        assert!(page.bulks.is_empty());
     }
 }

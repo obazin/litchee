@@ -41,6 +41,16 @@ pub enum LichessGameStatusName {
     VariantEnd,
 }
 
+/// A game status: its numeric id together with its [`LichessGameStatusName`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessGameStatus {
+    /// The numeric status id (e.g. `10` created, `20` started, `30` mate).
+    pub id: u32,
+    /// The status name.
+    pub name: LichessGameStatusName,
+}
+
 /// The opening of a game.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -156,6 +166,9 @@ pub struct LichessGamePlayer {
     /// The player's team id, in team games.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub team: Option<String>,
+    /// Whether the player berserked. Only present in Arena tournament games.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub berserk: Option<bool>,
 }
 
 /// Both sides of a game.
@@ -302,8 +315,9 @@ pub struct LichessImportedGame {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct LichessNowPlayingOpponent {
-    /// The opponent's id.
-    pub id: String,
+    /// The opponent's id. `None` for AI or anonymous opponents.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     /// The opponent's username.
     pub username: String,
     /// The opponent's rating.
@@ -341,6 +355,12 @@ pub struct LichessNowPlayingGame {
     pub last_move: Option<String>,
     /// The opponent.
     pub opponent: LichessNowPlayingOpponent,
+    /// The authenticated user's rating in this game.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rating: Option<u32>,
+    /// The game status (numeric id and name).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<LichessGameStatus>,
     /// The perf key.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub perf: Option<String>,
@@ -388,6 +408,15 @@ pub struct LichessGameChatMessage {
     pub user: String,
     /// The message text.
     pub text: String,
+}
+
+/// The spectator chat of a game. `GET /api/game/{gameId}/chat`
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessSpectatorChat {
+    /// The chat lines.
+    #[serde(default)]
+    pub lines: Vec<LichessGameChatMessage>,
 }
 
 /// A move-by-move update from a game move stream. `GET /api/stream/game/{id}`
@@ -486,5 +515,34 @@ mod tests {
         assert_eq!(side.ai_level, Some(5));
         assert!(side.user.is_none());
         assert!(side.analysis.unwrap().phases.is_none());
+    }
+
+    #[test]
+    fn parses_player_berserk_flag() {
+        let json = r#"{"user":{"id":"a","name":"A"},"rating":1600,"berserk":true}"#;
+        let side: LichessGamePlayer = serde_json::from_str(json).unwrap();
+        assert_eq!(side.berserk, Some(true));
+    }
+
+    #[test]
+    fn parses_now_playing_against_ai_with_null_opponent_id() {
+        let json = r#"{"gameId":"g","fullId":"gf","color":"white","fen":"x","rating":1700,
+            "status":{"id":20,"name":"started"},
+            "opponent":{"id":null,"username":"Stockfish level 4","ai":4}}"#;
+        let game: LichessNowPlayingGame = serde_json::from_str(json).unwrap();
+        assert_eq!(game.rating, Some(1700));
+        assert_eq!(game.opponent.id, None);
+        assert_eq!(game.opponent.ai, Some(4));
+        let status = game.status.unwrap();
+        assert_eq!(status.id, 20);
+        assert_eq!(status.name, LichessGameStatusName::Started);
+    }
+
+    #[test]
+    fn parses_spectator_chat_lines_object() {
+        let json = r#"{"lines":[{"user":"Toby","text":"e4"},{"user":"Dog","text":"woof"}]}"#;
+        let chat: LichessSpectatorChat = serde_json::from_str(json).unwrap();
+        assert_eq!(chat.lines.len(), 2);
+        assert_eq!(chat.lines[0].user, "Toby");
     }
 }

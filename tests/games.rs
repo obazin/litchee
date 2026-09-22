@@ -116,8 +116,13 @@ async fn import_game_posts_pgn() {
 #[tokio::test]
 async fn now_playing_returns_games() {
     let server = MockServer::start().await;
-    let body = r#"{"nbMyTurn":1,"nowPlaying":[{"gameId":"g","fullId":"gf","color":"white","fen":"x",
-        "opponent":{"id":"o","username":"O","rating":1500}}]}"#;
+    let body = r#"{"nbMyTurn":1,"nowPlaying":[
+        {"gameId":"g","fullId":"gf","color":"white","fen":"x","rating":1600,
+         "status":{"id":20,"name":"started"},
+         "opponent":{"id":"o","username":"O","rating":1500}},
+        {"gameId":"h","fullId":"hf","color":"black","fen":"y",
+         "status":{"id":20,"name":"started"},
+         "opponent":{"id":null,"username":"Stockfish level 3","ai":3}}]}"#;
     Mock::given(method("GET"))
         .and(path("/api/account/playing"))
         .and(query_param("nb", "10"))
@@ -126,8 +131,15 @@ async fn now_playing_returns_games() {
         .await;
     let playing = client(&server).games().now_playing(Some(10)).await.unwrap();
     assert_eq!(playing.nb_my_turn, 1);
-    assert_eq!(playing.now_playing[0].game_id, "g");
-    assert_eq!(playing.now_playing[0].opponent.username, "O");
+    let human = &playing.now_playing[0];
+    assert_eq!(human.game_id, "g");
+    assert_eq!(human.rating, Some(1600));
+    assert_eq!(human.opponent.id.as_deref(), Some("o"));
+    assert_eq!(human.opponent.username, "O");
+    assert_eq!(human.status.as_ref().unwrap().id, 20);
+    let ai = &playing.now_playing[1];
+    assert_eq!(ai.opponent.id, None);
+    assert_eq!(ai.opponent.ai, Some(3));
 }
 
 #[tokio::test]
@@ -136,7 +148,8 @@ async fn chat_returns_messages() {
     Mock::given(method("GET"))
         .and(path("/api/game/g/chat"))
         .respond_with(
-            ResponseTemplate::new(200).set_body_string(r#"[{"user":"Toby","text":"hi"}]"#),
+            ResponseTemplate::new(200)
+                .set_body_string(r#"{"lines":[{"user":"Toby","text":"hi"}]}"#),
         )
         .mount(&server)
         .await;
