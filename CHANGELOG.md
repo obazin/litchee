@@ -3,6 +3,21 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.1.11](https://github.com/obazin/litchee/releases/tag/v0.1.11) — 2026-09-23
+Changes since [v0.1.10](https://github.com/obazin/litchee/releases/tag/v0.1.10).
+
+
+### Breaking changes
+- TeamsApi::members no longer takes a `full` argument and
+now yields LichessTeamMember instead of LichessUser. Call
+
+
+### Dependencies & spec
+- Sync client with Lichess API v2.0.174 (#60)
+- **deps:** Bump reqwest from 0.13.4 to 0.13.5 in the cargo-minor-patch group (#58)
+- **deps:** Bump rustls 0.23.40 -> 0.23.45 (RUSTSEC-2026-0285) (#57)
+- Sync Lichess API spec to v2.0.171 (add note:write OAuth scope) (#56)
+- Sync Lichess API spec to v2.0.170 (external-engine bestmove note) (#55)
 ## [v0.1.10](https://github.com/obazin/litchee/releases/tag/v0.1.10) — 2026-09-05
 Changes since [v0.1.9](https://github.com/obazin/litchee/releases/tag/v0.1.9).
 
