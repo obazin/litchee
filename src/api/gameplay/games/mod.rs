@@ -20,9 +20,10 @@ pub use export::{
 pub use model::{
     LichessAnalysisPhases, LichessGame, LichessGameArenaTour, LichessGameChatMessage,
     LichessGameClock, LichessGameDivision, LichessGameMoveAnalysis, LichessGameMoveUpdate,
-    LichessGameOpening, LichessGamePlayer, LichessGamePlayers, LichessGameStatusName,
-    LichessGameSwissTour, LichessImportedGame, LichessMoveJudgment, LichessNowPlaying,
-    LichessNowPlayingGame, LichessNowPlayingOpponent, LichessPlayerAnalysis,
+    LichessGameOpening, LichessGamePlayer, LichessGamePlayers, LichessGameStatus,
+    LichessGameStatusName, LichessGameSwissTour, LichessImportedGame, LichessMoveJudgment,
+    LichessNowPlaying, LichessNowPlayingGame, LichessNowPlayingOpponent, LichessPlayerAnalysis,
+    LichessSpectatorChat,
 };
 
 /// Accessor for the Games API.
@@ -108,7 +109,8 @@ impl<'a> GamesApi<'a> {
     pub async fn chat(&self, game_id: &str) -> Result<Vec<LichessGameChatMessage>> {
         let path = format!("/api/game/{}/chat", http::segment(game_id));
         let request = self.client.request(Method::GET, Host::Default, &path);
-        http::json(request, "Vec<LichessGameChatMessage>").await
+        let chat: LichessSpectatorChat = http::json(request, "LichessSpectatorChat").await?;
+        Ok(chat.lines)
     }
 
     /// Bookmarks a game for the authenticated user. `POST /bookmark/{gameId}`

@@ -430,6 +430,9 @@ pub struct LichessStudyImportResult {
     /// The chapters that were created.
     #[serde(default)]
     pub chapters: Vec<LichessStudyChapter>,
+    /// An error message, if some of the games could not be imported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[cfg(test)]
@@ -472,5 +475,14 @@ mod tests {
         let result: LichessStudyImportResult = serde_json::from_str(json).unwrap();
         assert_eq!(result.chapters[0].id.as_deref(), Some("iBjmYBya"));
         assert_eq!(result.chapters[0].players[1].name, None);
+        assert_eq!(result.error, None);
+    }
+
+    #[test]
+    fn parses_import_result_with_error() {
+        let json = r#"{"chapters":[],"error":"Invalid PGN"}"#;
+        let result: LichessStudyImportResult = serde_json::from_str(json).unwrap();
+        assert!(result.chapters.is_empty());
+        assert_eq!(result.error.as_deref(), Some("Invalid PGN"));
     }
 }
