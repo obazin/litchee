@@ -8,7 +8,8 @@
 use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::social::teams::TeamTournamentQuery;
-use wiremock::matchers::{body_string_contains, method, path, query_param};
+use litchee::model::LichessTitle;
+use wiremock::matchers::{body_string_contains, method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> LichessClient {
@@ -52,7 +53,37 @@ async fn all_paginates() {
 }
 
 #[tokio::test]
-async fn members_streams_users() {
+async fn members_streams_light_members() {
+    let server = MockServer::start().await;
+    let body = concat!(
+        r#"{"name":"Mary","flair":"nature.crab","id":"mary","url":"https://lichess.org/@/Mary","joinedTeamAt":1789044568734}"#,
+        "\n",
+        r#"{"name":"Bob","id":"bob","title":"GM","joinedTeamAt":1789044000000}"#,
+        "\n",
+    );
+    Mock::given(method("GET"))
+        .and(path("/api/team/coders/users"))
+        .and(query_param_is_missing("full"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server).teams().members("coders").await.unwrap();
+    let members: Vec<_> = stream.map(Result::unwrap).collect().await;
+
+    assert_eq!(members.len(), 2);
+    assert_eq!(members[0].user.name, "Mary");
+    assert_eq!(members[0].joined_team_at, Some(1_789_044_568_734));
+    assert_eq!(
+        members[0].url.as_deref(),
+        Some("https://lichess.org/@/Mary")
+    );
+    assert_eq!(members[1].user.id, "bob");
+    assert_eq!(members[1].user.title, Some(LichessTitle::Gm));
+}
+
+#[tokio::test]
+async fn members_full_streams_user_profiles() {
     let server = MockServer::start().await;
     let body = "{\"id\":\"a\",\"username\":\"A\"}\n{\"id\":\"b\",\"username\":\"B\"}\n";
     Mock::given(method("GET"))
@@ -64,12 +95,13 @@ async fn members_streams_users() {
 
     let stream = client(&server)
         .teams()
-        .members("coders", Some(true))
+        .members_full("coders")
         .await
         .unwrap();
-    let members: Vec<_> = stream.collect().await;
+    let members: Vec<_> = stream.map(Result::unwrap).collect().await;
 
     assert_eq!(members.len(), 2);
+    assert_eq!(members[1].username, "B");
 }
 
 #[tokio::test]
