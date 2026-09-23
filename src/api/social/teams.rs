@@ -70,19 +70,41 @@ impl<'a> TeamsApi<'a> {
         http::json(request, "LichessTeamPaginator").await
     }
 
-    /// Streams the members of a team. `GET /api/team/{teamId}/users`
+    /// Streams the members of a team, most recent first, as light member
+    /// records (up to 5,000). `GET /api/team/{teamId}/users`
     ///
-    /// `full` includes each member's full profile.
+    /// Use [`members_full`](Self::members_full) for full user profiles.
     pub async fn members(
         &self,
         team_id: &str,
-        full: Option<bool>,
+    ) -> Result<BoxStream<'static, Result<LichessTeamMember>>> {
+        self.stream_members(team_id, false).await
+    }
+
+    /// Streams the members of a team, most recent first, as full user
+    /// profiles with performance ratings (up to 1,000).
+    /// `GET /api/team/{teamId}/users?full=true`
+    pub async fn members_full(
+        &self,
+        team_id: &str,
     ) -> Result<BoxStream<'static, Result<LichessUser>>> {
+        self.stream_members(team_id, true).await
+    }
+
+    /// Streams `GET /api/team/{teamId}/users`, decoding each line as `T`.
+    async fn stream_members<T>(
+        &self,
+        team_id: &str,
+        full: bool,
+    ) -> Result<BoxStream<'static, Result<T>>>
+    where
+        T: serde::de::DeserializeOwned + Send + 'static,
+    {
         let path = format!("/api/team/{}/users", http::segment(team_id));
-        let request = self
-            .client
-            .request(Method::GET, Host::Default, &path)
-            .query(&[("full", full)]);
+        let mut request = self.client.request(Method::GET, Host::Default, &path);
+        if full {
+            request = request.query(&[("full", true)]);
+        }
         http::stream(request, self.client.max_line_bytes()).await
     }
 
@@ -272,6 +294,22 @@ impl LichessClient {
     pub fn teams(&self) -> TeamsApi<'_> {
         TeamsApi::new(self)
     }
+}
+
+/// A team member, as streamed by [`TeamsApi::members`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct LichessTeamMember {
+    /// The member's identity: id, name, flair, title, and patron status.
+    #[serde(flatten)]
+    pub user: LichessLightUser,
+    /// When the member joined the team (Unix milliseconds).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub joined_team_at: Option<i64>,
+    /// The member's profile URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 /// A team.
@@ -486,6 +524,28 @@ mod tests {
             serde_urlencoded::to_string(TeamTournamentQuery::default()).unwrap(),
             ""
         );
+    }
+
+    #[test]
+    fn parses_light_team_member() {
+        let json = r#"{"name":"Mary","flair":"nature.crab","id":"mary","patronColor":3,
+            "url":"https://lichess.org/@/Mary","joinedTeamAt":1789044568734}"#;
+        let member: LichessTeamMember = serde_json::from_str(json).unwrap();
+        assert_eq!(member.user.id, "mary");
+        assert_eq!(member.user.name, "Mary");
+        assert_eq!(member.user.flair.as_deref(), Some("nature.crab"));
+        assert_eq!(member.user.patron_color, Some(3));
+        assert_eq!(member.joined_team_at, Some(1_789_044_568_734));
+        assert_eq!(member.url.as_deref(), Some("https://lichess.org/@/Mary"));
+    }
+
+    #[test]
+    fn parses_team_member_with_only_required_fields() {
+        let json = r#"{"id":"mary","name":"Mary"}"#;
+        let member: LichessTeamMember = serde_json::from_str(json).unwrap();
+        assert_eq!(member.user.name, "Mary");
+        assert_eq!(member.joined_team_at, None);
+        assert_eq!(member.url, None);
     }
 
     #[test]
