@@ -6,7 +6,7 @@
 #![allow(clippy::too_many_lines)]
 
 use litchee::LichessClient;
-use litchee::api::users::players::UserQuery;
+use litchee::api::users::players::{LichessRatingHistoryPerf, UserQuery};
 use wiremock::matchers::{body_string_contains, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -173,7 +173,7 @@ async fn autocomplete_objects_returns_users() {
 #[tokio::test]
 async fn rating_history_returns_entries() {
     let server = MockServer::start().await;
-    let body = r#"[{"name":"Bullet","points":[[2011,0,8,1472]]}]"#;
+    let body = r#"[{"name":"bullet","points":[[2011,0,8,1472]]},{"name":"puzzle","points":[]}]"#;
     Mock::given(method("GET"))
         .and(path("/api/user/bobby/rating-history"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
@@ -184,7 +184,8 @@ async fn rating_history_returns_entries() {
         .rating_history("bobby")
         .await
         .unwrap();
-    assert_eq!(history[0].name, "Bullet");
+    assert_eq!(history[0].name, LichessRatingHistoryPerf::Bullet);
+    assert_eq!(history[1].name, LichessRatingHistoryPerf::Puzzle);
 }
 
 #[tokio::test]
