@@ -300,6 +300,9 @@ pub struct LichessGameEventPlayer {
     /// The player's rating.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rating: Option<u32>,
+    /// The rating change from this game (may be negative).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rating_diff: Option<i32>,
     /// Whether the rating is provisional.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provisional: Option<bool>,
@@ -471,8 +474,8 @@ mod tests {
     #[test]
     fn parses_game_full_with_nested_state() {
         let json = r#"{"type":"gameFull","id":"g","rated":false,
-            "white":{"id":"a","name":"A","rating":1700},
-            "black":{"id":"b","name":"B","rating":1600},
+            "white":{"id":"a","name":"A","rating":1700,"ratingDiff":8},
+            "black":{"id":"b","name":"B","rating":1600,"ratingDiff":-8},
             "initialFen":"startpos",
             "state":{"type":"gameState","moves":"e2e4","wtime":900000,"btime":900000,
                      "winc":0,"binc":0,"status":"started"}}"#;
@@ -481,6 +484,8 @@ mod tests {
             LichessBoardEvent::GameFull(full) => {
                 assert_eq!(full.id, "g");
                 assert_eq!(full.state.moves, "e2e4");
+                assert_eq!(full.white.unwrap().rating_diff, Some(8));
+                assert_eq!(full.black.unwrap().rating_diff, Some(-8));
             }
             other => panic!("expected gameFull, got {other:?}"),
         }

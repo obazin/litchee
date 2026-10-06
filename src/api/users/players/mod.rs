@@ -492,7 +492,12 @@ mod tests {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct LichessRatingHistoryEntry {
-    /// The perf name (e.g. `"Blitz"`).
+    /// The perf key this entry covers.
+    ///
+    /// As of API v2.0.176 this is a `PerfType` key or `"puzzle"` in camelCase
+    /// (e.g. `"blitz"`, `"kingOfTheHill"`, `"puzzle"`) — earlier releases
+    /// returned display names such as `"Blitz"`. Kept as a `String` for forward
+    /// compatibility, matching how perf keys are represented elsewhere.
     pub name: String,
     /// Data points, each `[year, month, day, rating]` (month is 0-indexed).
     #[serde(default)]
@@ -605,10 +610,13 @@ mod added_tests {
 
     #[test]
     fn parses_rating_history() {
-        let json = r#"[{"name":"Bullet","points":[[2011,0,8,1472],[2011,8,12,1314]]}]"#;
+        let json = r#"[{"name":"bullet","points":[[2011,0,8,1472],[2011,8,12,1314]]},
+                       {"name":"puzzle","points":[]}]"#;
         let history: Vec<LichessRatingHistoryEntry> = serde_json::from_str(json).unwrap();
-        assert_eq!(history[0].name, "Bullet");
+        assert_eq!(history[0].name, "bullet");
         assert_eq!(history[0].points[1], [2011, 8, 12, 1314]);
+        assert_eq!(history[1].name, "puzzle");
+        assert!(history[1].points.is_empty());
     }
 
     #[test]
