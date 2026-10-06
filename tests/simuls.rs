@@ -40,5 +40,5 @@ async fn current_returns_grouped_simuls() {
     assert_eq!(simuls.started.len(), 1);
     assert_eq!(simuls.started[0].host.user.name, "Bobby");
     assert!(simuls.started[0].is_running);
-    assert!(simuls.pending.is_empty());
+    assert_eq!(simuls.pending, []);
 }

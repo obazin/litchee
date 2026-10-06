@@ -343,6 +343,6 @@ mod tests {
     #[test]
     fn parses_empty_bulk_pairings_list() {
         let page: LichessBulkPairings = serde_json::from_str("{}").unwrap();
-        assert!(page.bulks.is_empty());
+        assert_eq!(page.bulks, []);
     }
 }

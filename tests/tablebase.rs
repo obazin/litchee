@@ -59,7 +59,7 @@ async fn standard_sends_dtc_query() {
         .await
         .unwrap();
 
-    assert!(position.moves.is_empty());
+    assert_eq!(position.moves, []);
 }
 
 #[tokio::test]
@@ -89,5 +89,5 @@ async fn antichess_lookup_hits_the_variant_path() {
 
     let position = client(&server).tablebase().antichess("fen").await.unwrap();
 
-    assert!(position.moves.is_empty());
+    assert_eq!(position.moves, []);
 }

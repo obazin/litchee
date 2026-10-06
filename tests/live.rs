@@ -62,8 +62,8 @@ async fn daily_puzzle() {
         .daily()
         .await
         .expect("fetch daily puzzle");
-    assert!(!daily.puzzle.id.is_empty());
-    assert!(!daily.game.id.is_empty());
+    assert_ne!(daily.puzzle.id, "");
+    assert_ne!(daily.game.id, "");
 }
 
 #[tokio::test]
@@ -113,5 +113,5 @@ async fn authenticated_account_profile() {
         .profile()
         .await
         .expect("fetch own profile");
-    assert!(!me.user.id.is_empty());
+    assert_ne!(me.user.id, "");
 }

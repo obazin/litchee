@@ -613,6 +613,6 @@ mod tests {
         let of_team: LichessTeamUpdatesOfTeam = serde_json::from_str(json).unwrap();
         assert_eq!(of_team.team.id, "coders");
         assert!(of_team.subscribed);
-        assert!(of_team.updates.current_page_results.is_empty());
+        assert_eq!(of_team.updates.current_page_results, []);
     }
 }

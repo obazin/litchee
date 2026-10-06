@@ -704,7 +704,7 @@ mod tests {
     fn parses_challenge_list_in_out() {
         let json = r#"{"in":[],"out":[{"id":"x","url":"u","status":"created"}]}"#;
         let challenges: LichessChallenges = serde_json::from_str(json).unwrap();
-        assert!(challenges.incoming.is_empty());
+        assert_eq!(challenges.incoming, []);
         assert_eq!(challenges.outgoing.len(), 1);
     }
 }
