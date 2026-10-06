@@ -35,7 +35,7 @@ async fn list_returns_in_and_out() {
     let challenges = client(&server).challenges().list().await.unwrap();
 
     assert_eq!(challenges.incoming.len(), 1);
-    assert!(challenges.outgoing.is_empty());
+    assert_eq!(challenges.outgoing, []);
 }
 
 #[tokio::test]

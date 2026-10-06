@@ -482,7 +482,7 @@ mod tests {
     fn parses_import_result_with_error() {
         let json = r#"{"chapters":[],"error":"Invalid PGN"}"#;
         let result: LichessStudyImportResult = serde_json::from_str(json).unwrap();
-        assert!(result.chapters.is_empty());
+        assert_eq!(result.chapters, []);
         assert_eq!(result.error.as_deref(), Some("Invalid PGN"));
     }
 }

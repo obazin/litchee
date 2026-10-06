@@ -44,8 +44,8 @@ async fn account_profile_decodes_spec_example() {
     let me = client(&server).account().profile().await.unwrap();
     // Assert nested fields too, so a DTO that drops/renames one is caught
     // (serde ignores unknown fields, so a bare id check would not notice).
-    assert!(!me.user.id.is_empty());
-    assert!(!me.url.is_empty());
+    assert_ne!(me.user.id, "");
+    assert_ne!(me.url, "");
     assert!(me.user.perfs.is_some(), "perfs should decode");
     assert!(me.count.is_some(), "count should decode");
 }
@@ -64,8 +64,8 @@ async fn user_public_data_decodes_spec_example() {
         .get("anyone", &UserQuery::default())
         .await
         .unwrap();
-    assert!(!user.user.id.is_empty());
-    assert!(!user.user.username.is_empty());
+    assert_ne!(user.user.id, "");
+    assert_ne!(user.user.username, "");
     assert!(user.user.perfs.is_some(), "perfs should decode");
 }
 
@@ -84,7 +84,7 @@ async fn game_decodes_spec_example() {
         .json()
         .await
         .unwrap();
-    assert!(!game.id.is_empty());
+    assert_ne!(game.id, "");
     assert!(game.moves.is_some(), "moves should decode");
     assert!(game.status.is_some(), "status should decode");
     // `players.white`/`black` are non-optional, so this also exercises their decode.
@@ -101,8 +101,8 @@ async fn team_decodes_spec_example() {
     )
     .await;
     let team = client(&server).teams().get("anyteam").await.unwrap();
-    assert!(!team.id.is_empty());
-    assert!(!team.name.is_empty());
+    assert_ne!(team.id, "");
+    assert_ne!(team.name, "");
     assert!(team.leader.is_some(), "leader should decode");
 }
 

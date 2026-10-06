@@ -48,7 +48,7 @@ fn authorization_url_contains_all_pkce_parameters() {
     assert_eq!(params["scope"], "board:play challenge:write");
     assert_eq!(params["state"], auth.state);
     assert_eq!(params["username"], "bobby");
-    assert!(!params["code_challenge"].is_empty());
+    assert_ne!(params["code_challenge"], "");
 }
 
 #[tokio::test]

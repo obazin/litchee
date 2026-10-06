@@ -168,7 +168,7 @@ async fn dashboard_and_storm() {
         .solve_batch("mix", &sols, 0)
         .await
         .unwrap();
-    assert!(batch.puzzles.is_empty());
+    assert_eq!(batch.puzzles, []);
 }
 
 #[tokio::test]

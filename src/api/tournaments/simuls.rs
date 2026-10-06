@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn simuls_default_missing_groups_to_empty() {
         let simuls: LichessSimuls = serde_json::from_str(r#"{"started":[]}"#).unwrap();
-        assert!(simuls.pending.is_empty());
-        assert!(simuls.finished.is_empty());
+        assert_eq!(simuls.pending, []);
+        assert_eq!(simuls.finished, []);
     }
 }
