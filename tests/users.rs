@@ -6,7 +6,7 @@
 #![allow(clippy::too_many_lines)]
 
 use litchee::LichessClient;
-use litchee::api::users::players::UserQuery;
+use litchee::api::users::players::{LichessRatingHistoryPerf, UserQuery};
 use wiremock::matchers::{body_string_contains, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -184,8 +184,8 @@ async fn rating_history_returns_entries() {
         .rating_history("bobby")
         .await
         .unwrap();
-    assert_eq!(history[0].name, "bullet");
-    assert_eq!(history[1].name, "puzzle");
+    assert_eq!(history[0].name, LichessRatingHistoryPerf::Bullet);
+    assert_eq!(history[1].name, LichessRatingHistoryPerf::Puzzle);
 }
 
 #[tokio::test]

@@ -492,16 +492,51 @@ mod tests {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct LichessRatingHistoryEntry {
-    /// The perf key this entry covers.
-    ///
-    /// As of API v2.0.176 this is a `PerfType` key or `"puzzle"` in camelCase
-    /// (e.g. `"blitz"`, `"kingOfTheHill"`, `"puzzle"`) — earlier releases
-    /// returned display names such as `"Blitz"`. Kept as a `String` for forward
-    /// compatibility, matching how perf keys are represented elsewhere.
-    pub name: String,
+    /// The perf this entry covers.
+    pub name: LichessRatingHistoryPerf,
     /// Data points, each `[year, month, day, rating]` (month is 0-indexed).
     #[serde(default)]
     pub points: Vec<[i32; 4]>,
+}
+
+/// The perf a rating-history entry covers: a `PerfType` key or `puzzle`.
+///
+/// Since API v2.0.176 the wire value is the camelCase key (e.g. `"blitz"`,
+/// `"kingOfTheHill"`, `"puzzle"`) rather than a display name such as `"Blitz"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub enum LichessRatingHistoryPerf {
+    /// Ultra-bullet.
+    UltraBullet,
+    /// Bullet.
+    Bullet,
+    /// Blitz.
+    Blitz,
+    /// Rapid.
+    Rapid,
+    /// Classical.
+    Classical,
+    /// Correspondence.
+    Correspondence,
+    /// Chess960 (Fischer random).
+    Chess960,
+    /// Crazyhouse.
+    Crazyhouse,
+    /// Antichess.
+    Antichess,
+    /// Atomic.
+    Atomic,
+    /// Horde.
+    Horde,
+    /// King of the Hill.
+    KingOfTheHill,
+    /// Racing Kings.
+    RacingKings,
+    /// Three-check.
+    ThreeCheck,
+    /// Puzzle rating.
+    Puzzle,
 }
 
 /// A private note about another player.
@@ -613,10 +648,17 @@ mod added_tests {
         let json = r#"[{"name":"bullet","points":[[2011,0,8,1472],[2011,8,12,1314]]},
                        {"name":"puzzle","points":[]}]"#;
         let history: Vec<LichessRatingHistoryEntry> = serde_json::from_str(json).unwrap();
-        assert_eq!(history[0].name, "bullet");
+        assert_eq!(history[0].name, LichessRatingHistoryPerf::Bullet);
         assert_eq!(history[0].points[1], [2011, 8, 12, 1314]);
-        assert_eq!(history[1].name, "puzzle");
-        assert!(history[1].points.is_empty());
+        assert_eq!(history[1].name, LichessRatingHistoryPerf::Puzzle);
+        assert_eq!(history[1].points, Vec::<[i32; 4]>::new());
+    }
+
+    #[test]
+    fn rating_history_perf_uses_camel_case_keys() {
+        let perf: LichessRatingHistoryPerf = serde_json::from_str(r#""kingOfTheHill""#).unwrap();
+        assert_eq!(perf, LichessRatingHistoryPerf::KingOfTheHill);
+        assert!(serde_json::from_str::<LichessRatingHistoryPerf>(r#""Blitz""#).is_err());
     }
 
     #[test]

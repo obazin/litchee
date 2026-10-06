@@ -23,7 +23,7 @@ fn client(server: &MockServer) -> LichessClient {
 async fn stream_game_yields_full_then_state() {
     let server = MockServer::start().await;
     let body = concat!(
-        r#"{"type":"gameFull","id":"g","white":{"id":"a","name":"A"},"black":{"id":"b","name":"B"},"state":{"type":"gameState","moves":"","wtime":1,"btime":1,"winc":0,"binc":0,"status":"started"}}"#,
+        r#"{"type":"gameFull","id":"g","white":{"id":"a","name":"A","rating":1700,"ratingDiff":11},"black":{"id":"b","name":"B","rating":1600,"ratingDiff":-11},"state":{"type":"gameState","moves":"","wtime":1,"btime":1,"winc":0,"binc":0,"status":"started"}}"#,
         "\n",
         r#"{"type":"gameState","moves":"e2e4","wtime":1,"btime":1,"winc":0,"binc":0,"status":"started"}"#,
         "\n",
@@ -38,10 +38,15 @@ async fn stream_game_yields_full_then_state() {
     let events: Vec<_> = stream.collect().await;
 
     assert_eq!(events.len(), 2);
-    assert!(matches!(
-        events[0].as_ref().unwrap(),
-        LichessBoardEvent::GameFull(_)
-    ));
+    match events[0].as_ref().unwrap() {
+        LichessBoardEvent::GameFull(full) => {
+            let white = full.white.as_ref().expect("white player present");
+            let black = full.black.as_ref().expect("black player present");
+            assert_eq!(white.rating_diff, Some(11));
+            assert_eq!(black.rating_diff, Some(-11));
+        }
+        other => panic!("expected gameFull, got {other:?}"),
+    }
     assert!(matches!(
         events[1].as_ref().unwrap(),
         LichessBoardEvent::GameState(_)
