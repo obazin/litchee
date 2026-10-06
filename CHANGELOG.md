@@ -3,6 +3,20 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.2.0](https://github.com/obazin/litchee/releases/tag/v0.2.0) — 2026-10-06
+Changes since [v0.1.11](https://github.com/obazin/litchee/releases/tag/v0.1.11).
+
+
+### Breaking changes
+- LichessRatingHistoryEntry.name is now LichessRatingHistoryPerf instead of String.
+
+
+### Fixes
+- Satisfy clippy 1.99 assert_is_empty lint (#67)
+
+
+### Dependencies & spec
+- **deps:** Bump the cargo-minor-patch group with 2 updates (#63)
 ## [v0.1.11](https://github.com/obazin/litchee/releases/tag/v0.1.11) — 2026-09-23
 Changes since [v0.1.10](https://github.com/obazin/litchee/releases/tag/v0.1.10).
 
