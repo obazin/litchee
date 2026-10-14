@@ -2,7 +2,7 @@
 name = "litchee"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.99"
 authors = ["Olivier Bazin <olivierbazin.it@gmail.com>"]
 description = "Async, builder-pattern Rust client for the Lichess API: full endpoint coverage, NDJSON streaming, and OAuth2 PKCE ('Log in with Lichess')."
 documentation = "https://docs.rs/litchee"
