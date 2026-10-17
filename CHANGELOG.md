@@ -3,6 +3,18 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.2.1](https://github.com/obazin/litchee/releases/tag/v0.2.1) — 2026-10-17
+Changes since [v0.2.0](https://github.com/obazin/litchee/releases/tag/v0.2.0).
+
+
+### Fixes
+- **deps:** Bump quinn-proto and rustls past RustSec advisories
+
+
+### Dependencies & spec
+- **deps:** Bump the cargo-minor-patch group across 1 directory with 3 updates
+- **reference:** Bump vendored lichess-api spec to upstream 36d3afe
+- **deps:** Bump tokio (#68)
 ## [v0.2.0](https://github.com/obazin/litchee/releases/tag/v0.2.0) — 2026-10-06
 Changes since [v0.1.11](https://github.com/obazin/litchee/releases/tag/v0.1.11).
 
