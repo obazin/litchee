@@ -3,12 +3,12 @@
 A practical playbook for locking down and documenting `litchee`'s public API,
 tailored to the current crate. Ordered roughly the way it should be done.
 
-> Tooling note: this project gets its toolchain from the Nix dev shell in `flake.nix`, which consumes the shared **`obazin/rust-projects`** flake. The pin (currently **1.95.0**, matching the MSRV and README) lives there rather than in a `rust-toolchain.toml` of our own, so bumping Rust is one commit in that repo for the whole estate. Add project-specific tools to the `extra` list in `flake.nix` — **not** `cargo install`. Anything in the pinned nixpkgs is reachable as `lib.pkgs.<tool>`.
+> Tooling note: this project gets its toolchain from the Nix dev shell in `flake.nix`, which consumes the shared **`obazin/rust-projects`** flake. The pin (the latest stable Rust, currently **1.99.0**, matching the MSRV and README) lives there rather than in a `rust-toolchain.toml` of our own, so bumping Rust is one commit in that repo for the whole estate. Add project-specific tools to the `extra` list in `flake.nix` — **not** `cargo install`. Anything in the pinned nixpkgs is reachable as `lib.pkgs.<tool>`.
 >
 > Nightly requirement for the API tooling (verified 2026-06-15): both
 > `cargo public-api` and `cargo-semver-checks` consume **rustdoc JSON**, which is
-> a **nightly-only** feature. The default shell pins *stable* 1.95.0, and stable
-> rustdoc rejects it (`rustdoc -Z unstable-options --output-format json` →
+> a **nightly-only** feature. The default shell pins *stable* (now 1.99.0),
+> and stable rustdoc rejects it (`rustdoc -Z unstable-options --output-format json` →
 > "the option `Z` is only accepted on the nightly compiler"). So these tools
 > cannot run in the default shell as-is.
 >
@@ -99,9 +99,7 @@ tailored to the current crate. Ordered roughly the way it should be done.
 
 ## 6. Commit to a versioning policy
 
-- [ ] Document in the README: pre-1.0 vs. the semver guarantees made at 1.0,
-      the MSRV policy (currently pinned 1.95 — state whether a bump is minor or
-      patch), and that `#[non_exhaustive]` means `match` arms need a wildcard.
+- [ ] Document in the README: pre-1.0 vs. the semver guarantees made at 1.0, and that `#[non_exhaustive]` means `match` arms need a wildcard. (The MSRV policy — tracks latest stable, raised in any minor release — is already stated there.)
 
 ---
 
