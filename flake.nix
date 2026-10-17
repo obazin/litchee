@@ -4,8 +4,9 @@
   # The toolchain pin lives in rust-projects, not here. Do not add a
   # rust-toolchain.toml: the dev shell materializes the shared one at the
   # project root so rustup and Nix agree, and there is only ever one pin to
-  # bump. It carries the same 1.95.0 this crate declares as its MSRV in
-  # Cargo.toml.
+  # bump. The pin tracks the latest stable Rust, and this crate's MSRV follows
+  # it: raise rust-version in Cargo.toml whenever this input is updated to a
+  # new toolchain (CI's MSRV job reads that field).
   inputs.rust-projects.url = "github:obazin/rust-projects";
 
   outputs =

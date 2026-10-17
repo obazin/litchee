@@ -152,7 +152,7 @@ names** (types, methods, modules). Borrow concepts, not code or identifiers.
 ---
 
 ## Common commands
-The Rust toolchain comes from the Nix dev shell in `flake.nix`, which consumes the shared [`obazin/rust-projects`](https://github.com/obazin/rust-projects) flake. The pin (1.95.0 — this crate's MSRV) lives there, so bumping Rust moves every project at once; the shell materializes the canonical `rust-toolchain.toml` at the project root as a symlink into the Nix store, which is why the repo carries no copy of its own. Run commands inside it:
+The Rust toolchain comes from the Nix dev shell in `flake.nix`, which consumes the shared [`obazin/rust-projects`](https://github.com/obazin/rust-projects) flake. The pin — the latest stable Rust, currently 1.99.0 — lives there, so bumping Rust moves every project at once. This crate's MSRV follows it: raise `rust-version` in `Cargo.toml` to match on each flake update; the CI MSRV job reads that field, so it needs no edit. The shell materializes the canonical `rust-toolchain.toml` at the project root as a symlink into the Nix store, which is why the repo carries no copy of its own. Run commands inside it:
 ```bash
 nix develop --command cargo build          # or: direnv allow, then plain cargo
 cargo test                 # unit + integration tests

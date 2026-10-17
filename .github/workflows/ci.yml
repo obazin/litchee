@@ -49,11 +49,24 @@ jobs:
           RUSTDOCFLAGS: -D warnings
 
   msrv:
-    name: Minimum supported Rust version (1.95)
+    # Version-agnostic name on purpose: it is a required status check, so it
+    # must not change every time the toolchain moves.
+    name: Minimum supported Rust version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.95.0
+      # The MSRV tracks the latest stable pinned by the rust-projects flake and
+      # is declared once, as Cargo.toml's rust-version. Read it from there so a
+      # toolchain bump never needs a matching edit here.
+      - name: Read rust-version from Cargo.toml
+        id: msrv
+        run: |
+          version=$(sed -n 's/^rust-version = "\(.*\)"$/\1/p' Cargo.toml)
+          test -n "$version" || { echo "::error::no rust-version in Cargo.toml"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
       - uses: Swatinem/rust-cache@v2
       - name: Check library
         # Only the library affects downstream MSRV; dev-deps (tests/examples)
@@ -69,10 +82,10 @@ jobs:
     # runtime via GitHub's documented override until a tagged release ships it.
     #
     # RUSTUP_TOOLCHAIN=stable: the action runs `cargo install cargo-audit`, whose
-    # dependency tree now needs rustc >= 1.96 (kstring 2.0.3). This job installs
-    # no toolchain of its own, so it must not end up on the MSRV — kept explicit
-    # here even though the repo no longer commits a rust-toolchain.toml that
-    # could impose one as a directory override (same reasoning as `test` above).
+    # dependency tree tracks recent rustc releases. This job installs no
+    # toolchain of its own, so keep it explicitly on the runner's stable rather
+    # than whatever default or directory override might apply (same reasoning
+    # as `test` above).
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       RUSTUP_TOOLCHAIN: stable

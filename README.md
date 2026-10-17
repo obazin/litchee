@@ -65,7 +65,7 @@ tokio = { version = "1", features = ["full"] }
 futures-util = "0.3" # to consume streams with `.next()`
 ```
 
-The minimum supported Rust version is **1.95** (edition 2024).
+The minimum supported Rust version is **1.99** (edition 2024). The MSRV tracks the latest stable Rust release and may be raised in any minor release.
 
 ## Examples
 

@@ -36,11 +36,11 @@ updates:
       prefix: chore
       include: scope
     ignore:
-      # dtolnay/rust-toolchain's tag is the Rust *channel* (i.e. our MSRV), not
-      # an action version. Left alone, Dependabot "bumps" @1.95.0 -> @1.100.0,
-      # which rewrites the MSRV and fails CI (rustup can't install a nonexistent
-      # toolchain). The MSRV is managed deliberately via rust-toolchain.toml and
-      # Cargo.toml's rust-version, so this action is excluded from updates.
+      # dtolnay/rust-toolchain's ref names a Rust *channel* (@stable, @master
+      # with an explicit toolchain), not an action version, so there is nothing
+      # meaningful for Dependabot to bump. The MSRV is managed deliberately: the
+      # rust-projects flake pins the toolchain, Cargo.toml's rust-version mirrors
+      # it, and the CI MSRV job reads that field. Excluded from updates.
       - dependency-name: "dtolnay/rust-toolchain"
     groups:
       github-actions:
