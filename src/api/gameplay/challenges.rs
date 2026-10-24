@@ -682,13 +682,14 @@ mod tests {
 
     #[test]
     fn parses_challenge_with_clock_time_control() {
-        let json = r#"{"id":"H9fIRZUk","url":"https://lichess.org/H9fIRZUk",
+        let json = r#"{"id":"H9fIRZUk","url":"https://lichess.org/game/H9fIRZUk",
             "status":"created","challenger":{"id":"bot1","name":"Bot1","rating":1500},
             "destUser":{"id":"bobby","name":"Bobby"},"rated":true,"speed":"rapid",
             "timeControl":{"type":"clock","limit":600,"increment":0,"show":"10+0"},
             "color":"random","finalColor":"black","direction":"out"}"#;
         let challenge: LichessChallenge = serde_json::from_str(json).unwrap();
         assert_eq!(challenge.id, "H9fIRZUk");
+        assert_eq!(challenge.url, "https://lichess.org/game/H9fIRZUk");
         assert_eq!(challenge.color, Some(LichessChallengeColor::Random));
         assert_eq!(
             challenge.time_control,
