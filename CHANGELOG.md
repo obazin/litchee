@@ -3,6 +3,17 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.2.2](https://github.com/obazin/litchee/releases/tag/v0.2.2) — 2026-10-25
+Changes since [v0.2.1](https://github.com/obazin/litchee/releases/tag/v0.2.1).
+
+
+### Fixes
+- **deps:** Bump rustls-webpki and webpki-root-certs to patched versions (#74)
+
+
+### Dependencies & spec
+- **reference:** Bump vendored lichess-api spec to upstream fe249ff
+- **deps:** Bump reference/lichess-api from `36d3afe` to `fedb6b8` (#73)
 ## [v0.2.1](https://github.com/obazin/litchee/releases/tag/v0.2.1) — 2026-10-17
 Changes since [v0.2.0](https://github.com/obazin/litchee/releases/tag/v0.2.0).
 
