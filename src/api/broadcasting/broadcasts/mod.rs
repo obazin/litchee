@@ -66,6 +66,9 @@ impl<'a> BroadcastsApi<'a> {
     }
 
     /// Searches broadcasts. `GET /api/broadcast/search`
+    ///
+    /// Requires an OAuth token with (at least) the
+    /// [`study:read`](crate::api::auth::oauth::Scope::StudyRead) scope.
     pub async fn search(&self, query: &str, page: u32) -> Result<LichessBroadcastSearchPage> {
         let request = self
             .client
