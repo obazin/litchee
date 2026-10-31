@@ -216,6 +216,11 @@ impl<'a> BulkPairingRequest<'a> {
     }
 
     /// Sets a message sent to all players when their game starts.
+    ///
+    /// The `{opponent}` and `{game}` placeholders are replaced with the
+    /// opponent and game URLs; a custom message must contain at least
+    /// `{game}`. Pass the literal `{noMessage}` to disable the start message
+    /// entirely (you must then notify the players about their games yourself).
     #[must_use]
     pub fn message(mut self, message: &'a str) -> Self {
         self.form.message = Some(message);
