@@ -66,6 +66,9 @@ impl<'a> BroadcastsApi<'a> {
     }
 
     /// Searches broadcasts. `GET /api/broadcast/search`
+    ///
+    /// Requires authentication: the client must carry a token with the
+    /// `study:read` `OAuth2` scope.
     pub async fn search(&self, query: &str, page: u32) -> Result<LichessBroadcastSearchPage> {
         let request = self
             .client
