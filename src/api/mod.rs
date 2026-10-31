@@ -10,6 +10,7 @@ pub mod broadcasting;
 pub mod database;
 pub mod engine;
 pub mod gameplay;
+pub mod server;
 pub mod social;
 pub mod tournaments;
 pub mod training;
