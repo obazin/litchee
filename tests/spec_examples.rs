@@ -145,6 +145,20 @@ async fn team_updates_of_team_decodes_spec_example() {
 }
 
 #[tokio::test]
+async fn server_version_decodes_spec_example() {
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/api/version",
+        include_str!("fixtures/server_version.json"),
+    )
+    .await;
+    let version = client(&server).server().version().await.unwrap();
+    assert!(!version.server.date.is_empty(), "date should decode");
+    assert!(!version.server.commit.is_empty(), "commit should decode");
+}
+
+#[tokio::test]
 async fn puzzle_decodes_spec_example() {
     let server = MockServer::start().await;
     serve(
