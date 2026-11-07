@@ -337,10 +337,16 @@ mod tests {
             "players":[{"color":"white","id":"a","name":"A","rating":1500},
                        {"color":"black","id":"b","name":"B","rating":1490}],"rated":true},
             "puzzle":{"id":"p","initialPly":20,"plays":100,"rating":1600,
-                      "solution":["e2e4"],"themes":["mateIn1"]}}"#;
+                      "fen":"r1bqr1k1/pp3ppp/8/8/8/8/PP3PPP/R1BQR1K1 w - - 0 1",
+                      "lastMove":"e5h2","solution":["e2e4"],"themes":["mateIn1"]}}"#;
         let pg: LichessPuzzleAndGame = serde_json::from_str(json).unwrap();
         assert_eq!(pg.puzzle.id, "p");
         assert_eq!(pg.puzzle.solution, vec!["e2e4"]);
+        assert_eq!(
+            pg.puzzle.fen.as_deref(),
+            Some("r1bqr1k1/pp3ppp/8/8/8/8/PP3PPP/R1BQR1K1 w - - 0 1")
+        );
+        assert_eq!(pg.puzzle.last_move.as_deref(), Some("e5h2"));
         assert_eq!(pg.game.players.len(), 2);
     }
 
