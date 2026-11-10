@@ -119,7 +119,7 @@ impl<'a> UsersApi<'a> {
         http::json(request, "LichessCrosstable").await
     }
 
-    /// Autocompletes usernames from a prefix (at least 3 characters).
+    /// Autocompletes usernames from a prefix (at least 4 characters).
     ///
     /// Returns a builder; refine it with the optional filters and finish with
     /// [`AutocompleteRequest::send`]. `GET /api/player/autocomplete`
