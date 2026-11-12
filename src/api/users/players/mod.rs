@@ -119,7 +119,7 @@ impl<'a> UsersApi<'a> {
         http::json(request, "LichessCrosstable").await
     }
 
-    /// Autocompletes usernames from a prefix (at least 3 characters).
+    /// Autocompletes usernames from a prefix (at least 4 characters).
     ///
     /// Returns a builder; refine it with the optional filters and finish with
     /// [`AutocompleteRequest::send`]. `GET /api/player/autocomplete`
@@ -459,13 +459,13 @@ mod tests {
     #[test]
     fn autocomplete_query_serializes_filters() {
         let query = AutocompleteQuery {
-            term: "bob",
+            term: "bobb",
             names: Some(true),
             team: Some("coders"),
             ..Default::default()
         };
         let encoded = serde_urlencoded::to_string(&query).unwrap();
-        assert_eq!(encoded, "term=bob&names=true&team=coders");
+        assert_eq!(encoded, "term=bobb&names=true&team=coders");
     }
 
     #[test]
