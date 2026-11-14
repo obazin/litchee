@@ -107,7 +107,7 @@ async fn autocomplete_returns_usernames() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/api/player/autocomplete"))
-        .and(query_param("term", "bob"))
+        .and(query_param("term", "bobb"))
         .and(query_param("team", "coders"))
         .and(query_param("friend", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(r#"["bobby","bobbyfischer"]"#))
@@ -116,7 +116,7 @@ async fn autocomplete_returns_usernames() {
 
     let names = client(&server)
         .users()
-        .autocomplete("bob")
+        .autocomplete("bobb")
         .team("coders")
         .friend(true)
         .send()
@@ -153,7 +153,7 @@ async fn autocomplete_objects_returns_users() {
     let body = r#"{"result":[{"id":"bobby","name":"Bobby","online":true}]}"#;
     Mock::given(method("GET"))
         .and(path("/api/player/autocomplete"))
-        .and(query_param("term", "bob"))
+        .and(query_param("term", "bobb"))
         .and(query_param("object", "true"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
@@ -161,7 +161,7 @@ async fn autocomplete_objects_returns_users() {
 
     let users = client(&server)
         .users()
-        .autocomplete("bob")
+        .autocomplete("bobb")
         .objects()
         .await
         .unwrap();
