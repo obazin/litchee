@@ -388,6 +388,7 @@ grouped by category. The tables below map each concern's endpoints to its module
 - **Four hosts, one client.** `lichess.org`, `explorer.lichess.org`,
   `tablebase.lichess.org`, and `engine.lichess.ovh` are routed internally; each
   is overridable on the builder (for self-hosted lila, `localhost`, or mocks).
+- **`User-Agent` on every request.** Lichess requires one and asks that it identify your application. litchee sends `litchee/<version>` by default; set your own (website URL, app name, or contact email) with `LichessClient::builder().user_agent(...)`. It is attached per request, so it also applies when you supply your own `reqwest::Client` via `http_client`.
 - **Strong, forward-compatible types.** Every DTO is prefixed `Lichess*` and is
   `#[non_exhaustive]`. Where the API returns very large or evolving aggregates
   (e.g. perf stats, activity feeds, broadcast nested payloads), the documented
