@@ -3,6 +3,38 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.2.3](https://github.com/obazin/litchee/releases/tag/v0.2.3) — 2026-11-14
+Changes since [v0.2.2](https://github.com/obazin/litchee/releases/tag/v0.2.2).
+
+
+### Breaking changes
+- **client:** Reqwest gives no way to read a client's default headers
+and a per-request header wins over them, so a User-Agent configured only
+on a custom reqwest::Client is now replaced by litchee's (default
+`litchee/<version>`). Set it with `LichessClientBuilder::user_agent`
+instead.
+
+
+### Features
+- **server:** Add GET /api/version endpoint
+
+
+### Fixes
+- **deps:** Bump quinn-udp to 0.5.16 for RUSTSEC-2026-0538
+
+
+### Documentation
+- **users:** Autocomplete term now requires at least 4 characters
+- **broadcasts:** Link the study:read scope on search
+- **bulk-pairing:** Document {noMessage} message template value
+- **broadcasts:** Note study:read scope now required for search
+
+
+### Dependencies & spec
+- Bump vendored lichess-api spec to bbbd115
+- **deps:** Bump reference/lichess-api from `c1644a7` to `e599217` (#84)
+- **reference:** Bump vendored lichess-api spec to upstream v2.0.178
+- **deps:** Bump tokio from 1.53.3 to 1.54.1 in the cargo-minor-patch group (#78)
 ## [v0.2.2](https://github.com/obazin/litchee/releases/tag/v0.2.2) — 2026-10-25
 Changes since [v0.2.1](https://github.com/obazin/litchee/releases/tag/v0.2.1).
 
