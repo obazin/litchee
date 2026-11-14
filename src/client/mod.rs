@@ -4,10 +4,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use reqwest::Method;
+use reqwest::header::{HeaderValue, USER_AGENT};
 use url::Url;
 
 use crate::config::{Config, Host};
-use crate::error::Result;
+use crate::error::{LichessError, Result};
 use crate::http::ApiRequest;
 use crate::retry::RetryPolicy;
 use crate::secret::Secret;
@@ -62,11 +63,18 @@ impl LichessClient {
 
     /// Builds an authenticated request to `host` + `path` (path starts `/`).
     ///
-    /// Internal: the single place the bearer token is attached. The request
-    /// carries the client's [`RetryPolicy`] so rate-limited calls can retry.
+    /// Internal: the single place the `User-Agent` and bearer token are
+    /// attached. Setting the `User-Agent` per request (rather than on the
+    /// `reqwest::Client`) is what makes it reach the wire when the caller
+    /// supplied their own client, since Lichess requires one on every request.
+    /// The request carries the client's [`RetryPolicy`] so rate-limited calls
+    /// can retry.
     pub(crate) fn request(&self, method: Method, host: Host, path: &str) -> ApiRequest {
         let url = self.config.url(host, path);
-        let builder = self.http.request(method, url);
+        let builder = self
+            .http
+            .request(method, url)
+            .header(USER_AGENT, self.config.user_agent.clone());
         let builder = match &self.config.token {
             Some(token) => builder.bearer_auth(token.expose()),
             None => builder,
@@ -103,6 +111,7 @@ impl Default for LichessClient {
 pub struct LichessClientBuilder {
     config: Config,
     http: Option<reqwest::Client>,
+    user_agent: Option<String>,
     connect_timeout: Option<Duration>,
     read_timeout: Option<Duration>,
 }
@@ -121,11 +130,22 @@ impl LichessClientBuilder {
         self
     }
 
-    /// Overrides the `User-Agent` header (ignored if a custom HTTP client is
-    /// supplied via [`http_client`](Self::http_client)).
+    /// Sets the `User-Agent` sent on every request (default `litchee/<version>`).
+    ///
+    /// Lichess requires a `User-Agent` on every request and may reject or
+    /// rate-limit requests without one. It asks that the value identify your
+    /// application, for example your website URL, your application's name, or a
+    /// contact email, so prefer setting one over relying on the default.
+    ///
+    /// The value applies with a custom [`http_client`](Self::http_client) too,
+    /// overriding any `User-Agent` configured on that client.
+    ///
+    /// Surrounding whitespace is trimmed. [`build`](Self::build) fails with
+    /// [`LichessError::InvalidRequest`] if the value is blank or is not a valid
+    /// HTTP header value.
     #[must_use]
     pub fn user_agent(mut self, user_agent: impl Into<String>) -> Self {
-        self.config.user_agent = user_agent.into();
+        self.user_agent = Some(user_agent.into());
         self
     }
 
@@ -133,7 +153,9 @@ impl LichessClientBuilder {
     ///
     /// When set, the [`connect_timeout`](Self::connect_timeout) and
     /// [`read_timeout`](Self::read_timeout) are ignored — configure timeouts on
-    /// your own client instead.
+    /// your own client instead. The `User-Agent` is still attached by litchee
+    /// on every request and takes precedence over one set on your client:
+    /// configure it with [`user_agent`](Self::user_agent).
     #[must_use]
     pub fn http_client(mut self, http: reqwest::Client) -> Self {
         self.http = Some(http);
@@ -223,21 +245,48 @@ impl LichessClientBuilder {
     /// Finishes building the client.
     ///
     /// # Errors
-    /// Returns a transport error if a default `reqwest::Client` cannot be built.
-    pub fn build(self) -> Result<LichessClient> {
-        let http = match self.http {
+    /// Returns [`LichessError::InvalidRequest`] if the
+    /// [`user_agent`](Self::user_agent) is blank or not a valid header value,
+    /// or a transport error if a default `reqwest::Client` cannot be built.
+    pub fn build(mut self) -> Result<LichessClient> {
+        if let Some(user_agent) = self.user_agent.take() {
+            self.config.user_agent = parse_user_agent(&user_agent)?;
+        }
+        let http = match self.http.take() {
             Some(http) => http,
-            None => reqwest::Client::builder()
-                .user_agent(&self.config.user_agent)
-                .connect_timeout(self.connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT))
-                .read_timeout(self.read_timeout.unwrap_or(DEFAULT_READ_TIMEOUT))
-                .build()?,
+            None => default_http_client(self.connect_timeout, self.read_timeout)?,
         };
         Ok(LichessClient {
             http,
             config: Arc::new(self.config),
         })
     }
+}
+
+/// Validates a caller-supplied `User-Agent` as a non-blank HTTP header value,
+/// trimming surrounding whitespace (which a header value may not carry).
+fn parse_user_agent(user_agent: &str) -> Result<HeaderValue> {
+    let user_agent = user_agent.trim();
+    if user_agent.is_empty() {
+        return Err(LichessError::InvalidRequest(
+            "User-Agent must not be blank".to_owned(),
+        ));
+    }
+    HeaderValue::from_str(user_agent).map_err(|error| {
+        LichessError::InvalidRequest(format!("invalid User-Agent {user_agent:?}: {error}"))
+    })
+}
+
+/// Builds the built-in `reqwest::Client` with the given (or default) timeouts.
+fn default_http_client(
+    connect_timeout: Option<Duration>,
+    read_timeout: Option<Duration>,
+) -> Result<reqwest::Client> {
+    let http = reqwest::Client::builder()
+        .connect_timeout(connect_timeout.unwrap_or(DEFAULT_CONNECT_TIMEOUT))
+        .read_timeout(read_timeout.unwrap_or(DEFAULT_READ_TIMEOUT))
+        .build()?;
+    Ok(http)
 }
 
 #[cfg(test)]
@@ -297,5 +346,72 @@ mod tests {
             .get(reqwest::header::AUTHORIZATION)
             .unwrap();
         assert_eq!(auth, "Bearer lip_test");
+    }
+
+    /// The `User-Agent` header a client attaches to a request it builds.
+    fn user_agent_of(client: &LichessClient) -> HeaderValue {
+        let request = client
+            .request(Method::GET, Host::Default, "/api/account")
+            .build()
+            .unwrap();
+        request.headers().get(USER_AGENT).unwrap().clone()
+    }
+
+    #[test]
+    fn request_carries_the_default_user_agent() {
+        let user_agent = user_agent_of(&LichessClient::new());
+        assert_eq!(user_agent, crate::config::DEFAULT_USER_AGENT);
+    }
+
+    #[test]
+    fn request_carries_a_custom_user_agent() {
+        let client = LichessClient::builder()
+            .user_agent("my-bot (https://example.org)")
+            .build()
+            .unwrap();
+        assert_eq!(user_agent_of(&client), "my-bot (https://example.org)");
+    }
+
+    #[test]
+    fn custom_http_client_still_gets_the_default_user_agent() {
+        let client = LichessClient::builder()
+            .http_client(reqwest::Client::new())
+            .build()
+            .unwrap();
+        assert_eq!(user_agent_of(&client), crate::config::DEFAULT_USER_AGENT);
+    }
+
+    #[test]
+    fn custom_http_client_honours_the_configured_user_agent() {
+        let client = LichessClient::builder()
+            .http_client(reqwest::Client::new())
+            .user_agent("my-bot")
+            .build()
+            .unwrap();
+        assert_eq!(user_agent_of(&client), "my-bot");
+    }
+
+    #[test]
+    fn blank_user_agent_is_rejected_at_build() {
+        let result = LichessClient::builder().user_agent("  ").build();
+        assert!(matches!(result, Err(LichessError::InvalidRequest(_))));
+    }
+
+    #[test]
+    fn user_agent_with_a_newline_is_rejected_at_build() {
+        let result = LichessClient::builder().user_agent("bad\nagent").build();
+        assert!(matches!(result, Err(LichessError::InvalidRequest(_))));
+    }
+
+    #[test]
+    fn parse_user_agent_accepts_a_valid_value() {
+        let value = parse_user_agent("my-bot/1.0 (contact@example.org)").unwrap();
+        assert_eq!(value, "my-bot/1.0 (contact@example.org)");
+    }
+
+    #[test]
+    fn parse_user_agent_trims_surrounding_whitespace() {
+        let value = parse_user_agent("  my-bot  ").unwrap();
+        assert_eq!(value, "my-bot");
     }
 }

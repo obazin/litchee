@@ -6,6 +6,7 @@
 //! a request targets; [`Config`] holds the resolved base URLs plus the token
 //! and user agent.
 
+use reqwest::header::HeaderValue;
 use url::Url;
 
 use crate::retry::RetryPolicy;
@@ -54,7 +55,9 @@ pub(crate) struct Config {
     tablebase_base: String,
     engine_base: String,
     pub(crate) token: Option<Secret<String>>,
-    pub(crate) user_agent: String,
+    /// The `User-Agent` attached to every request, already validated as a
+    /// header value.
+    pub(crate) user_agent: HeaderValue,
     /// Maximum bytes buffered for a single NDJSON line before the stream errors
     /// with [`StreamError::LineTooLong`](crate::error::StreamError::LineTooLong),
     /// a guard against unbounded memory growth on a malformed/stalled stream.
@@ -71,7 +74,7 @@ impl Default for Config {
             tablebase_base: TABLEBASE_BASE.to_owned(),
             engine_base: ENGINE_BASE.to_owned(),
             token: None,
-            user_agent: DEFAULT_USER_AGENT.to_owned(),
+            user_agent: HeaderValue::from_static(DEFAULT_USER_AGENT),
             max_line_bytes: DEFAULT_MAX_LINE_BYTES,
             retry_policy: RetryPolicy::default(),
         }
