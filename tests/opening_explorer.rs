@@ -46,12 +46,12 @@ async fn masters_uses_the_explorer_host() {
 }
 
 #[tokio::test]
-async fn masters_sends_year_bounds_and_counts() {
+async fn masters_sends_month_bounds_and_counts() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/masters"))
-        .and(query_param("since", "1952"))
-        .and(query_param("until", "2020"))
+        .and(query_param("since", "1952-01"))
+        .and(query_param("until", "2020-12"))
         .and(query_param("moves", "10"))
         .and(query_param("topGames", "15"))
         .respond_with(ResponseTemplate::new(200).set_body_string(RESULT))
@@ -61,8 +61,8 @@ async fn masters_sends_year_bounds_and_counts() {
     let result = client(&server)
         .opening_explorer()
         .masters("startpos")
-        .since(1952)
-        .until(2020)
+        .since("1952-01")
+        .until("2020-12")
         .moves(10)
         .top_games(15)
         .send()
@@ -145,6 +145,38 @@ async fn lichess_sends_variant_dates_and_history() {
         .unwrap();
 
     assert_eq!(result.black, 60);
+}
+
+#[tokio::test]
+async fn lichess_parses_v4_game_fields() {
+    let server = MockServer::start().await;
+    let body = r#"{"white":100,"draws":40,"black":60,"moves":[],
+        "topGames":[{"id":"g1","uci":"e2e4","winner":"white","mode":"rated","speed":"blitz",
+            "white":{"name":"A","title":"GM","rating":2700},
+            "black":{"name":"B","rating":2600},"year":2020,"month":"2020-05"}],
+        "recentGames":[{"id":"g2","uci":"d2d4","winner":null,"mode":"casual",
+            "white":{"name":"C"},"black":{"name":"D"},"year":2024,"month":"2024-01"}]}"#;
+    Mock::given(method("GET"))
+        .and(path("/lichess"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let result = client(&server)
+        .opening_explorer()
+        .lichess("startpos")
+        .send()
+        .await
+        .unwrap();
+
+    let top = &result.top_games[0];
+    assert_eq!(top.mode, Some(ExplorerMode::Rated));
+    assert_eq!(top.speed, Some(LichessSpeed::Blitz));
+    assert_eq!(
+        top.white.as_ref().unwrap().title,
+        Some(litchee::model::LichessTitle::Gm)
+    );
+    assert_eq!(result.recent_games[0].mode, Some(ExplorerMode::Casual));
 }
 
 #[tokio::test]
