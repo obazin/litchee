@@ -285,3 +285,34 @@ async fn lichess_illegal_move_surfaces_the_plain_text_reason() {
         other => panic!("expected an API error, got {other:?}"),
     }
 }
+
+#[tokio::test]
+async fn player_full_indexing_queue_maps_to_a_specific_kind() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/player"))
+        .respond_with(
+            ResponseTemplate::new(503)
+                .insert_header("content-type", "text/plain")
+                .set_body_string("indexing queue full"),
+        )
+        .mount(&server)
+        .await;
+
+    let Err(error) = client(&server)
+        .opening_explorer()
+        .player("thibault", LichessColor::White, "startpos")
+        .stream()
+        .await
+    else {
+        panic!("expected the 503 to fail the request");
+    };
+
+    match error {
+        LichessError::Api(api) => {
+            assert_eq!(api.kind, ApiErrorKind::ExplorerIndexingQueueFull);
+            assert_eq!(api.message.as_deref(), Some("indexing queue full"));
+        }
+        other => panic!("expected an API error, got {other:?}"),
+    }
+}

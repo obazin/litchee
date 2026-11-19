@@ -4,12 +4,12 @@
 //! [`LichessClient::opening_explorer`].
 
 use futures_util::stream::BoxStream;
-use reqwest::Method;
+use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 
 use crate::client::LichessClient;
 use crate::config::Host;
-use crate::error::Result;
+use crate::error::{ApiErrorKind, LichessError, Result};
 use crate::http;
 use crate::model::{LichessColor, LichessSpeed, LichessVariantKey};
 
@@ -96,6 +96,18 @@ impl ExplorerMode {
             ExplorerMode::Casual => "casual",
             ExplorerMode::Rated => "rated",
         }
+    }
+}
+
+/// Reclassifies a `503` from `GET /player` as the distinct
+/// [`ApiErrorKind::ExplorerIndexingQueueFull`] (the spec's "indexing queue is
+/// full, try again later") rather than a generic server failure.
+fn map_queue_full(error: LichessError) -> LichessError {
+    match error {
+        LichessError::Api(api) if api.status == StatusCode::SERVICE_UNAVAILABLE => {
+            LichessError::Api(api.with_kind(ApiErrorKind::ExplorerIndexingQueueFull))
+        }
+        other => other,
     }
 }
 
@@ -422,13 +434,16 @@ impl<'a> PlayerExplorerRequest<'a> {
     }
 
     /// Executes the lookup, streaming results as they are computed (NDJSON).
-    /// `GET /player`
+    /// A full indexing queue fails with
+    /// [`ApiErrorKind::ExplorerIndexingQueueFull`]. `GET /player`
     pub async fn stream(self) -> Result<BoxStream<'static, Result<LichessExplorerResult>>> {
         let request = self
             .client
             .request(Method::GET, Host::OpeningExplorer, "/player")
             .query(&self.query);
-        http::stream(request, self.client.max_line_bytes()).await
+        http::stream(request, self.client.max_line_bytes())
+            .await
+            .map_err(map_queue_full)
     }
 }
 
@@ -640,6 +655,21 @@ mod tests {
                 mode
             );
         }
+    }
+
+    #[test]
+    fn queue_full_reclassifies_only_a_503() {
+        use crate::error::ApiError;
+        let kind_of =
+            |status: StatusCode| match map_queue_full(ApiError::new(status, None, None).into()) {
+                LichessError::Api(api) => api.kind,
+                other => panic!("expected an API error, got {other:?}"),
+            };
+        assert_eq!(
+            kind_of(StatusCode::SERVICE_UNAVAILABLE),
+            ApiErrorKind::ExplorerIndexingQueueFull
+        );
+        assert_eq!(kind_of(StatusCode::BAD_GATEWAY), ApiErrorKind::Server);
     }
 
     #[test]
