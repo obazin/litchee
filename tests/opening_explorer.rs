@@ -46,12 +46,12 @@ async fn masters_uses_the_explorer_host() {
 }
 
 #[tokio::test]
-async fn masters_sends_year_bounds_and_counts() {
+async fn masters_sends_month_year_bounds_and_counts() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/masters"))
         .and(query_param("since", "1952"))
-        .and(query_param("until", "2020"))
+        .and(query_param("until", "2020-06"))
         .and(query_param("moves", "10"))
         .and(query_param("topGames", "15"))
         .respond_with(ResponseTemplate::new(200).set_body_string(RESULT))
@@ -61,8 +61,8 @@ async fn masters_sends_year_bounds_and_counts() {
     let result = client(&server)
         .opening_explorer()
         .masters("startpos")
-        .since(1952)
-        .until(2020)
+        .since("1952")
+        .until("2020-06")
         .moves(10)
         .top_games(15)
         .send()
@@ -70,6 +70,34 @@ async fn masters_sends_year_bounds_and_counts() {
         .unwrap();
 
     assert_eq!(result.white, 100);
+}
+
+#[tokio::test]
+async fn lichess_decodes_game_mode_and_player_title() {
+    let server = MockServer::start().await;
+    let body = r#"{"white":1,"draws":0,"black":0,"moves":[],
+        "topGames":[{"id":"g","uci":"e2e4","winner":"black","mode":"casual",
+                     "speed":"rapid","year":2024,"month":"2024-03",
+                     "white":{"name":"A","title":"WIM","rating":2300},
+                     "black":{"name":"B","rating":2250}}]}"#;
+    Mock::given(method("GET"))
+        .and(path("/lichess"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let result = client(&server)
+        .opening_explorer()
+        .lichess("startpos")
+        .send()
+        .await
+        .unwrap();
+
+    let game = &result.top_games[0];
+    assert_eq!(game.mode, Some(ExplorerMode::Casual));
+    assert_eq!(game.speed, Some(LichessSpeed::Rapid));
+    assert_eq!(game.month.as_deref(), Some("2024-03"));
+    assert_eq!(game.white.as_ref().unwrap().title.as_deref(), Some("WIM"));
 }
 
 #[tokio::test]
