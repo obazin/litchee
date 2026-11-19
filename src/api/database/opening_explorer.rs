@@ -76,8 +76,11 @@ impl RatingGroup {
     }
 }
 
-/// A game mode the player explorer can be filtered to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A game mode the player explorer can be filtered to, and the `mode` of a
+/// Lichess-database game reference ([`LichessExplorerGame::mode`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ExplorerMode {
     /// Casual (unrated) games.
     Casual,
@@ -105,16 +108,17 @@ fn join_csv<'s>(parts: impl Iterator<Item = &'s str>) -> Option<String> {
     (!joined.is_empty()).then_some(joined)
 }
 
-/// Serializable `/masters` query. `since`/`until` are calendar years.
+/// Serializable `/masters` query. `since`/`until` are `YYYY-MM` or `YYYY`
+/// calendar bounds (`YYYY` means January / December of that year).
 #[derive(Debug, Default, Serialize)]
 struct MastersQuery<'a> {
     fen: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     play: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    since: Option<u16>,
+    since: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    until: Option<u16>,
+    until: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     moves: Option<u32>,
     #[serde(rename = "topGames", skip_serializing_if = "Option::is_none")]
@@ -197,17 +201,17 @@ impl<'a> MastersExplorerRequest<'a> {
         self
     }
 
-    /// Only games from this year or later.
+    /// Only games from this `YYYY-MM` or later (bare `YYYY` means January).
     #[must_use]
-    pub fn since(mut self, year: u16) -> Self {
-        self.query.since = Some(year);
+    pub fn since(mut self, since: &'a str) -> Self {
+        self.query.since = Some(since);
         self
     }
 
-    /// Only games from this year or earlier.
+    /// Only games from this `YYYY-MM` or earlier (bare `YYYY` means December).
     #[must_use]
-    pub fn until(mut self, year: u16) -> Self {
-        self.query.until = Some(year);
+    pub fn until(mut self, until: &'a str) -> Self {
+        self.query.until = Some(until);
         self
     }
 
@@ -283,14 +287,14 @@ impl<'a> LichessExplorerRequest<'a> {
         self
     }
 
-    /// Only games from this `YYYY-MM` or later.
+    /// Only games from this `YYYY-MM` or later (bare `YYYY` means January).
     #[must_use]
     pub fn since(mut self, since: &'a str) -> Self {
         self.query.since = Some(since);
         self
     }
 
-    /// Only games from this `YYYY-MM` or earlier.
+    /// Only games from this `YYYY-MM` or earlier (bare `YYYY` means December).
     #[must_use]
     pub fn until(mut self, until: &'a str) -> Self {
         self.query.until = Some(until);
@@ -389,14 +393,14 @@ impl<'a> PlayerExplorerRequest<'a> {
         self
     }
 
-    /// Only games from this `YYYY-MM` or later.
+    /// Only games from this `YYYY-MM` or later (bare `YYYY` means January).
     #[must_use]
     pub fn since(mut self, since: &'a str) -> Self {
         self.query.since = Some(since);
         self
     }
 
-    /// Only games from this `YYYY-MM` or earlier.
+    /// Only games from this `YYYY-MM` or earlier (bare `YYYY` means December).
     #[must_use]
     pub fn until(mut self, until: &'a str) -> Self {
         self.query.until = Some(until);
@@ -507,6 +511,9 @@ pub struct LichessExplorerGamePlayer {
     /// The player's name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// The player's title, if any (e.g. `GM`, `WIM`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     /// The player's rating.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rating: Option<u32>,
@@ -524,6 +531,14 @@ pub struct LichessExplorerGame {
     /// The winner, if any.
     #[serde(default)]
     pub winner: Option<LichessColor>,
+    /// Whether the game was rated or casual (Lichess-database games only;
+    /// absent for masters games).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<ExplorerMode>,
+    /// The time-control speed (Lichess-database games only; absent for
+    /// masters games).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speed: Option<LichessSpeed>,
     /// The white player.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub white: Option<LichessExplorerGamePlayer>,
@@ -601,12 +616,30 @@ mod tests {
             "white":100,"draws":40,"black":60,
             "moves":[{"uci":"e2e4","san":"e4","white":50,"draws":20,"black":30,
                       "averageRating":2400}],
-            "topGames":[{"id":"g","uci":"e2e4","winner":"white",
-                         "white":{"name":"A","rating":2700},"year":2020}]}"#;
+            "topGames":[{"id":"g","uci":"e2e4","winner":"white","mode":"rated",
+                         "speed":"blitz","year":2020,"month":"2020-05",
+                         "white":{"name":"A","title":"GM","rating":2700}}]}"#;
         let result: LichessExplorerResult = serde_json::from_str(json).unwrap();
         assert_eq!(result.white, 100);
         assert_eq!(result.moves[0].average_rating, Some(2400));
-        assert_eq!(result.top_games[0].winner, Some(LichessColor::White));
+        let game = &result.top_games[0];
+        assert_eq!(game.winner, Some(LichessColor::White));
+        assert_eq!(game.mode, Some(ExplorerMode::Rated));
+        assert_eq!(game.speed, Some(LichessSpeed::Blitz));
+        assert_eq!(game.month.as_deref(), Some("2020-05"));
+        assert_eq!(game.white.as_ref().unwrap().title.as_deref(), Some("GM"));
+    }
+
+    #[test]
+    fn explorer_mode_as_str_matches_its_serde_form() {
+        for mode in [ExplorerMode::Casual, ExplorerMode::Rated] {
+            let serialized = serde_json::to_string(&mode).unwrap();
+            assert_eq!(serialized, format!("\"{}\"", mode.as_str()));
+            assert_eq!(
+                serde_json::from_str::<ExplorerMode>(&serialized).unwrap(),
+                mode
+            );
+        }
     }
 
     #[test]
@@ -652,16 +685,16 @@ mod tests {
     }
 
     #[test]
-    fn masters_query_uses_year_bounds() {
+    fn masters_query_uses_month_or_year_bounds() {
         let client = client();
         let req = client
             .opening_explorer()
             .masters("f")
-            .since(1952)
-            .until(2020)
+            .since("1952")
+            .until("2020-06")
             .top_games(15);
-        assert_eq!(req.query.since, Some(1952));
-        assert_eq!(req.query.until, Some(2020));
+        assert_eq!(req.query.since, Some("1952"));
+        assert_eq!(req.query.until, Some("2020-06"));
         assert_eq!(req.query.top_games, Some(15));
     }
 
