@@ -8,6 +8,7 @@
 use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::database::opening_explorer::{ExplorerMode, RatingGroup};
+use litchee::error::{ApiErrorKind, LichessError};
 use litchee::model::{LichessColor, LichessSpeed, LichessVariantKey};
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -250,4 +251,37 @@ async fn player_sends_speeds_modes_and_recent_games() {
 
     let results: Vec<_> = stream.collect().await;
     assert_eq!(results.len(), 1);
+}
+
+#[tokio::test]
+async fn lichess_illegal_move_surfaces_the_plain_text_reason() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/lichess"))
+        .respond_with(
+            ResponseTemplate::new(400)
+                .insert_header("content-type", "text/plain; charset=utf-8")
+                .set_body_string("bad request: illegal move e2e5: illegal uci move"),
+        )
+        .mount(&server)
+        .await;
+
+    let error = client(&server)
+        .opening_explorer()
+        .lichess("startpos")
+        .play("e2e5")
+        .send()
+        .await
+        .unwrap_err();
+
+    match error {
+        LichessError::Api(api) => {
+            assert_eq!(api.kind, ApiErrorKind::BadRequest);
+            assert_eq!(
+                api.message.as_deref(),
+                Some("bad request: illegal move e2e5: illegal uci move")
+            );
+        }
+        other => panic!("expected an API error, got {other:?}"),
+    }
 }

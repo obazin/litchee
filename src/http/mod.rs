@@ -199,15 +199,29 @@ pub(crate) async fn send(request: ApiRequest) -> Result<Response> {
 async fn api_error(response: Response) -> LichessError {
     let status = response.status();
     let retry_after = retry_after_secs(response.headers());
+    let plain_text = is_plain_text(response.headers());
     let body = response.text().await.unwrap_or_default();
-    ApiError::new(status, error_message(&body), retry_after).into()
+    ApiError::new(status, error_message(&body, plain_text), retry_after).into()
 }
 
-/// Extracts the `error` field from a Lichess error body, if present. Pure.
-fn error_message(body: &str) -> Option<String> {
-    serde_json::from_str::<ErrorBody>(body)
-        .ok()
-        .map(|parsed| parsed.error)
+/// Extracts the reason from a Lichess error body: the `error` field of a JSON
+/// body or, for a `text/plain` response (e.g. the opening explorer's
+/// `bad request: illegal move ...`), the trimmed body itself. Pure.
+fn error_message(body: &str, plain_text: bool) -> Option<String> {
+    if let Ok(parsed) = serde_json::from_str::<ErrorBody>(body) {
+        return Some(parsed.error);
+    }
+    let trimmed = body.trim();
+    (plain_text && !trimmed.is_empty()).then(|| trimmed.to_owned())
+}
+
+/// Whether the response declares a `text/plain` body (parameters ignored). Pure.
+fn is_plain_text(headers: &HeaderMap) -> bool {
+    headers
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(';').next())
+        .is_some_and(|media| media.trim().eq_ignore_ascii_case(CONTENT_TYPE_PLAIN))
 }
 
 /// Parses the `Retry-After` header as a whole number of seconds. Pure.
@@ -266,15 +280,43 @@ mod tests {
     #[test]
     fn extracts_error_message_from_body() {
         assert_eq!(
-            error_message(r#"{"error":"Not found."}"#),
+            error_message(r#"{"error":"Not found."}"#, false),
             Some("Not found.".to_owned())
         );
     }
 
     #[test]
     fn ignores_non_error_bodies() {
-        assert_eq!(error_message(r#"{"ok":true}"#), None);
-        assert_eq!(error_message("plain text"), None);
+        assert_eq!(error_message(r#"{"ok":true}"#, false), None);
+        assert_eq!(error_message("plain text", false), None);
+    }
+
+    #[test]
+    fn keeps_trimmed_plain_text_reasons() {
+        assert_eq!(
+            error_message("bad request: illegal move e2e5\n", true),
+            Some("bad request: illegal move e2e5".to_owned())
+        );
+        assert_eq!(error_message("  \n", true), None);
+        assert_eq!(
+            error_message(r#"{"error":"json wins"}"#, true),
+            Some("json wins".to_owned())
+        );
+    }
+
+    #[test]
+    fn detects_plain_text_content_type() {
+        let mut headers = HeaderMap::new();
+        assert!(!is_plain_text(&headers));
+        let cases = [
+            ("Text/Plain; charset=utf-8", true),
+            ("text/plain-ish", false),
+            ("application/json", false),
+        ];
+        for (value, expected) in cases {
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static(value));
+            assert_eq!(is_plain_text(&headers), expected, "{value}");
+        }
     }
 
     #[test]
