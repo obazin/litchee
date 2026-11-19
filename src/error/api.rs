@@ -88,6 +88,10 @@ pub enum ApiErrorKind {
     /// user is not permitted to edit this Swiss (Lichess `SwissUnauthorisedEdit`),
     /// as opposed to a missing or invalid token ([`Unauthorized`](Self::Unauthorized)).
     SwissUnauthorizedEdit,
+    /// `503` from the player opening explorer (`GET /player`) — its indexing
+    /// queue is full; retry later. Distinct from a generic
+    /// [`Server`](Self::Server) failure.
+    ExplorerIndexingQueueFull,
     /// Any other status code not otherwise classified.
     Unexpected(u16),
 }
@@ -126,6 +130,7 @@ impl fmt::Display for ApiErrorKind {
             } => f.write_str("rate limited"),
             Self::Server => f.write_str("server error"),
             Self::SwissUnauthorizedEdit => f.write_str("not allowed to edit this swiss"),
+            Self::ExplorerIndexingQueueFull => f.write_str("explorer indexing queue is full"),
             Self::Unexpected(code) => write!(f, "unexpected status {code}"),
         }
     }
