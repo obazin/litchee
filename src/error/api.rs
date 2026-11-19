@@ -8,7 +8,8 @@ use reqwest::StatusCode;
 ///
 /// Carries the raw [`StatusCode`], a [`kind`](ApiErrorKind) derived from it so
 /// callers can match without comparing magic numbers, and the optional
-/// human-readable `message` parsed from the `{ "error": ... }` body.
+/// human-readable `message` parsed from the `{ "error": ... }` body (or, for
+/// a `text/plain` error response, the body text itself).
 #[derive(Debug, Clone)]
 pub struct ApiError {
     /// The HTTP status code of the response.
