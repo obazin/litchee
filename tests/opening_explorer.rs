@@ -25,6 +25,11 @@ const RESULT: &str = r#"{"opening":{"eco":"B01","name":"Scandinavian"},
     "white":100,"draws":40,"black":60,
     "moves":[{"uci":"e2e4","san":"e4","white":50,"draws":20,"black":30}]}"#;
 
+const HISTORY_RESULT: &str = r#"{"white":100,"draws":40,"black":60,"moves":[],
+    "topGames":[],"recentGames":[],
+    "history":[{"month":"2015-01","white":3,"draws":1,"black":2},
+               {"month":"2015-02","white":7,"draws":2,"black":5}]}"#;
+
 #[tokio::test]
 async fn masters_uses_the_explorer_host() {
     let server = MockServer::start().await;
@@ -156,7 +161,7 @@ async fn lichess_sends_variant_dates_and_history() {
         .and(query_param("topGames", "4"))
         .and(query_param("recentGames", "4"))
         .and(query_param("history", "true"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(RESULT))
+        .respond_with(ResponseTemplate::new(200).set_body_string(HISTORY_RESULT))
         .mount(&server)
         .await;
 
@@ -174,6 +179,13 @@ async fn lichess_sends_variant_dates_and_history() {
         .unwrap();
 
     assert_eq!(result.black, 60);
+    let history = result.history.expect("history was requested");
+    assert_eq!(history.len(), 2);
+    assert_eq!(history[0].month, "2015-01");
+    assert_eq!(
+        (history[1].white, history[1].draws, history[1].black),
+        (7, 2, 5)
+    );
 }
 
 #[tokio::test]

@@ -568,6 +568,21 @@ pub struct LichessExplorerGame {
     pub month: Option<String>,
 }
 
+/// One month of a position's game counts, returned in
+/// [`LichessExplorerResult::history`] when requested with `history(true)`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct LichessExplorerHistoryMonth {
+    /// The month, as `YYYY-MM`.
+    pub month: String,
+    /// Number of games White won that month.
+    pub white: u64,
+    /// Number of drawn games that month.
+    pub draws: u64,
+    /// Number of games Black won that month.
+    pub black: u64,
+}
+
 /// A candidate move with its aggregate statistics.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -614,6 +629,10 @@ pub struct LichessExplorerResult {
     /// Recent games from this position (Lichess/player databases).
     #[serde(default)]
     pub recent_games: Vec<LichessExplorerGame>,
+    /// Month-by-month game counts. `Some` only when the Lichess-database
+    /// lookup was sent with `history(true)`; `None` otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub history: Option<Vec<LichessExplorerHistoryMonth>>,
 }
 
 #[cfg(test)]
@@ -643,6 +662,7 @@ mod tests {
         assert_eq!(game.speed, Some(LichessSpeed::Blitz));
         assert_eq!(game.month.as_deref(), Some("2020-05"));
         assert_eq!(game.white.as_ref().unwrap().title.as_deref(), Some("GM"));
+        assert_eq!(result.history, None);
     }
 
     #[test]
