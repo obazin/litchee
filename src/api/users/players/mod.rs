@@ -59,7 +59,9 @@ impl<'a> UsersApi<'a> {
     /// Gets several users by id (up to 300), returned in the requested order.
     ///
     /// `profile`/`rank` include each user's full profile / leaderboard rank.
-    /// `POST /api/users`
+    /// Authenticating the client (via [`token`](crate::LichessClientBuilder::token))
+    /// raises the rate limit to 10,000 users / 10 minutes and 150,000 / day;
+    /// anonymous requests are allowed fewer. `POST /api/users`
     pub async fn get_many(
         &self,
         ids: &[&str],
