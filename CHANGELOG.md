@@ -3,6 +3,33 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.2.4](https://github.com/obazin/litchee/releases/tag/v0.2.4) — 2026-11-20
+Changes since [v0.2.3](https://github.com/obazin/litchee/releases/tag/v0.2.3).
+
+
+### Breaking changes
+- `MastersExplorerRequest::since` and `until` now take a
+`&str` (`YYYY-MM`, or bare `YYYY`) instead of a `u16` year, following
+the v4 explorer API. Replace `.since(1952)` with `.since("1952")`. Also,
+`ExplorerMode` is now `#[non_exhaustive]` (it is decoded from responses),
+so exhaustive matches on it need a wildcard arm.
+
+
+### Features
+- **opening-explorer:** Decode the month-by-month history
+- **opening-explorer:** Typed error for a full player-indexing queue
+
+
+### Fixes
+- **http:** Keep the reason from text/plain error responses
+
+
+### Documentation
+- Note authenticated rate limits on users get_many
+
+
+### Dependencies & spec
+- Bump vendored lichess-api spec to v2.0.180
 ## [v0.2.3](https://github.com/obazin/litchee/releases/tag/v0.2.3) — 2026-11-14
 Changes since [v0.2.2](https://github.com/obazin/litchee/releases/tag/v0.2.2).
 

@@ -1,6 +1,6 @@
 [package]
 name = "litchee"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2024"
 rust-version = "1.99"
 authors = ["Olivier Bazin <olivierbazin.it@gmail.com>"]
