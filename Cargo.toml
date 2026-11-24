@@ -54,7 +54,7 @@ thiserror = "2.0.18"
 # `time` only, for the retry backoff sleep; the reqwest client already requires
 # a tokio runtime, so this adds no new runtime constraint.
 tokio = { version = "1", default-features = false, features = ["time"] }
-url = "2.5.8"
+url = "2.5.9"
 
 [dev-dependencies]
 futures-util = "0.3.32"
