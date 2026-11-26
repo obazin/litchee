@@ -276,7 +276,7 @@ async fn show_recent_puzzles(client: &LichessClient) -> Result<(), Box<dyn Error
 /// to include private studies).
 async fn show_studies(client: &LichessClient, username: &str) -> Result<(), Box<dyn Error>> {
     println!("── studies you own or take part in ──");
-    let mut studies = client.studies().list_metadata(username).await?;
+    let mut studies = client.studies().list_metadata(username, None).await?;
     let mut count = 0;
     while let Some(study) = studies.next().await {
         let study = study?;

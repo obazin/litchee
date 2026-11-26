@@ -108,12 +108,19 @@ impl<'a> StudiesApi<'a> {
     }
 
     /// Streams metadata for a user's studies. `GET /api/study/by/{username}`
+    ///
+    /// `topics` opts in to each study's list of topics (populating
+    /// [`LichessStudyMetadata::topics`]); it defaults to `false` server-side.
     pub async fn list_metadata(
         &self,
         username: &str,
+        topics: Option<bool>,
     ) -> Result<BoxStream<'static, Result<LichessStudyMetadata>>> {
         let path = format!("/api/study/by/{}", http::segment(username));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("topics", topics)]);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
@@ -391,6 +398,10 @@ pub struct LichessStudyMetadata {
     /// Last-update time (Unix milliseconds).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<i64>,
+    /// The study's topics. Only populated when the request opts in via
+    /// `topics`; otherwise an empty list.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub topics: Vec<String>,
 }
 
 /// A player named in an imported chapter.
@@ -446,6 +457,17 @@ mod tests {
         let meta: LichessStudyMetadata = serde_json::from_str(json).unwrap();
         assert_eq!(meta.id, "WTvnkWAL");
         assert_eq!(meta.updated_at, Some(1_469_965_025_205));
+        // `topics` is absent unless opted into, and defaults to empty.
+        assert_eq!(meta.topics, [] as [String; 0]);
+    }
+
+    #[test]
+    fn parses_study_metadata_with_topics() {
+        let json = r#"{"id":"keq5vaIF","name":"Example study",
+            "createdAt":1793058160478,"updatedAt":1793058160499,
+            "topics":["Broadcast","Endgame"]}"#;
+        let meta: LichessStudyMetadata = serde_json::from_str(json).unwrap();
+        assert_eq!(meta.topics, ["Broadcast", "Endgame"]);
     }
 
     #[test]
