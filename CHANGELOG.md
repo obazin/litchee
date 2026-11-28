@@ -3,6 +3,18 @@
 All notable changes to **litchee** are documented in this file. It is generated
 from [Conventional Commits](https://www.conventionalcommits.org) by
 [git-cliff](https://git-cliff.org) — edit commit messages, not this file.
+## [v0.2.5](https://github.com/obazin/litchee/releases/tag/v0.2.5) — 2026-11-28
+Changes since [v0.2.4](https://github.com/obazin/litchee/releases/tag/v0.2.4).
+
+
+### Breaking changes
+- **studies:** StudiesApi::list_metadata now takes a second `topics: Option<bool>` argument; pass `None` to keep the previous behaviour.
+
+
+### Dependencies & spec
+- Bump vendored Lichess API spec to v2.0.182
+- **deps:** Bump the cargo-minor-patch group with 2 updates (#93)
+- **deps:** Bump url from 2.5.8 to 2.5.9 (#91)
 ## [v0.2.4](https://github.com/obazin/litchee/releases/tag/v0.2.4) — 2026-11-20
 Changes since [v0.2.3](https://github.com/obazin/litchee/releases/tag/v0.2.3).
 
