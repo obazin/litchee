@@ -108,12 +108,19 @@ impl<'a> StudiesApi<'a> {
     }
 
     /// Streams metadata for a user's studies. `GET /api/study/by/{username}`
+    ///
+    /// Pass `Some(true)` for `topics` to include each study's list of topics;
+    /// `None` and `Some(false)` both leave them out (the server default).
     pub async fn list_metadata(
         &self,
         username: &str,
+        topics: Option<bool>,
     ) -> Result<BoxStream<'static, Result<LichessStudyMetadata>>> {
         let path = format!("/api/study/by/{}", http::segment(username));
-        let request = self.client.request(Method::GET, Host::Default, &path);
+        let request = self
+            .client
+            .request(Method::GET, Host::Default, &path)
+            .query(&[("topics", topics)]);
         http::stream(request, self.client.max_line_bytes()).await
     }
 
@@ -391,6 +398,9 @@ pub struct LichessStudyMetadata {
     /// Last-update time (Unix milliseconds).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<i64>,
+    /// The study's topics, present only when requested via `topics=true`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub topics: Option<Vec<String>>,
 }
 
 /// A player named in an imported chapter.
@@ -446,6 +456,20 @@ mod tests {
         let meta: LichessStudyMetadata = serde_json::from_str(json).unwrap();
         assert_eq!(meta.id, "WTvnkWAL");
         assert_eq!(meta.updated_at, Some(1_469_965_025_205));
+        // `topics` is absent unless requested via `topics=true`.
+        assert_eq!(meta.topics, None);
+    }
+
+    #[test]
+    fn parses_study_metadata_with_topics() {
+        let json = r#"{"id":"keq5vaIF","name":"Example study",
+            "createdAt":1793058160478,"updatedAt":1793058160499,
+            "topics":["Broadcast","Endgame"]}"#;
+        let meta: LichessStudyMetadata = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            meta.topics.as_deref(),
+            Some(["Broadcast".to_owned(), "Endgame".to_owned()].as_slice())
+        );
     }
 
     #[test]
