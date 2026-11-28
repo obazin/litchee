@@ -164,7 +164,7 @@ use litchee::LichessClient;
 let client = LichessClient::builder().token("lip_your_token").build()?;
 
 // List a user's studies, then export the first one as PGN.
-let mut studies = client.studies().list_metadata("bobby").await?;
+let mut studies = client.studies().list_metadata("bobby", None).await?;
 if let Some(study) = studies.next().await {
     let study = study?;
     let pgn = client

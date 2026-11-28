@@ -9,7 +9,7 @@ use futures_util::StreamExt;
 use litchee::LichessClient;
 use litchee::api::training::studies::StudyChapterMode;
 use litchee::model::{LichessColor, PgnExportOptions};
-use wiremock::matchers::{body_string_contains, method, path, query_param};
+use wiremock::matchers::{body_string_contains, method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn client(server: &MockServer) -> LichessClient {
@@ -116,19 +116,49 @@ async fn list_metadata_streams_studies() {
     );
     Mock::given(method("GET"))
         .and(path("/api/study/by/bobby"))
+        .and(query_param_is_missing("topics"))
         .respond_with(ResponseTemplate::new(200).set_body_string(body))
         .mount(&server)
         .await;
 
     let stream = client(&server)
         .studies()
-        .list_metadata("bobby")
+        .list_metadata("bobby", None)
         .await
         .unwrap();
     let studies: Vec<_> = stream.collect().await;
 
     assert_eq!(studies.len(), 2);
     assert_eq!(studies[1].as_ref().unwrap().name, "Two");
+    assert_eq!(studies[0].as_ref().unwrap().topics, None);
+}
+
+#[tokio::test]
+async fn list_metadata_requests_and_parses_topics() {
+    let server = MockServer::start().await;
+    let body = concat!(
+        r#"{"id":"a","name":"One","createdAt":1,"updatedAt":2,"topics":["Broadcast"]}"#,
+        "\n",
+    );
+    Mock::given(method("GET"))
+        .and(path("/api/study/by/bobby"))
+        .and(query_param("topics", "true"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(&server)
+        .await;
+
+    let stream = client(&server)
+        .studies()
+        .list_metadata("bobby", Some(true))
+        .await
+        .unwrap();
+    let studies: Vec<_> = stream.collect().await;
+
+    assert_eq!(studies.len(), 1);
+    assert_eq!(
+        studies[0].as_ref().unwrap().topics.as_deref(),
+        Some(["Broadcast".to_owned()].as_slice())
+    );
 }
 
 #[tokio::test]
